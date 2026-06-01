@@ -1,270 +1,339 @@
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>🌿 Camera Trap — Registro Inteligente</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Firebase v9 compat -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 <style>
 :root {
-  --verde: #2d6a4f; --verde2: #40916c; --verde-bg: #d8f3dc; --verde-light: #f0faf3;
-  --amarelo: #f4a261; --laranja: #e76f51; --azul: #457b9d;
-  --borda: #dee2e6; --texto: #212529; --cinza: #6c757d;
-  --sombra: 0 2px 12px rgba(0,0,0,0.10);
-  --radius: 12px;
+  --verde:#2d6a4f;--verde2:#40916c;--verde-bg:#d8f3dc;--verde-light:#f0faf3;
+  --amarelo:#f4a261;--laranja:#e76f51;--azul:#457b9d;
+  --borda:#dee2e6;--texto:#212529;--cinza:#6c757d;
+  --sombra:0 2px 12px rgba(0,0,0,.10);--radius:12px;
 }
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Segoe UI', system-ui, sans-serif; background: #eaf4ee; color: var(--texto); }
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#eaf4ee;color:var(--texto);}
 
-header { background: var(--verde); color: white; padding: 13px 22px; display: flex; align-items: center; gap: 10px; box-shadow: var(--sombra); }
-header h1 { font-size: 1.15rem; font-weight: 700; }
-header .subtitle { font-size: 0.78rem; opacity: .7; margin-left: 6px; }
-header .spacer { flex: 1; }
-.api-status { font-size: 0.78rem; padding: 4px 10px; border-radius: 20px; cursor: pointer; border: 1.5px solid rgba(255,255,255,0.4); transition: all .2s; }
-.api-status:hover { background: rgba(255,255,255,0.15); }
-.api-status.ok { background: rgba(255,255,255,0.15); }
-.api-status.missing { background: rgba(231,111,81,0.6); border-color: transparent; animation: pulse 2s infinite; }
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.6} }
+/* ── LOGIN OVERLAY ── */
+#loginOverlay{position:fixed;inset:0;background:linear-gradient(135deg,#1a4731,#2d6a4f,#40916c);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;}
+.login-box{background:white;border-radius:20px;padding:36px 32px;max-width:400px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+.login-logo{font-size:3rem;margin-bottom:8px;}
+.login-title{font-size:1.4rem;font-weight:800;color:var(--verde);margin-bottom:4px;}
+.login-subtitle{font-size:.87rem;color:#666;margin-bottom:28px;line-height:1.5;}
+.btn-google{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;padding:13px;border:2px solid var(--borda);border-radius:10px;background:white;font-size:.95rem;font-weight:700;cursor:pointer;transition:all .2s;color:var(--texto);}
+.btn-google:hover{background:#f8f9fa;border-color:#aaa;box-shadow:var(--sombra);}
+.btn-google img{width:22px;height:22px;}
+.login-divider{display:flex;align-items:center;gap:10px;margin:20px 0;color:#aaa;font-size:.8rem;}
+.login-divider::before,.login-divider::after{content:'';flex:1;height:1px;background:var(--borda);}
+.btn-local{width:100%;padding:11px;border:1.5px solid var(--verde);border-radius:10px;background:var(--verde-light);color:var(--verde);font-size:.88rem;font-weight:700;cursor:pointer;transition:all .2s;}
+.btn-local:hover{background:var(--verde-bg);}
+.login-note{font-size:.75rem;color:#aaa;margin-top:16px;line-height:1.4;}
 
-/* TABS */
-.tabs { display: flex; background: white; border-bottom: 2px solid var(--borda); padding: 0 22px; gap: 2px; }
-.tab { padding: 11px 18px; cursor: pointer; font-weight: 600; font-size: 0.88rem; color: #666; border-bottom: 3px solid transparent; transition: all .2s; white-space: nowrap; }
-.tab.active { color: var(--verde); border-bottom-color: var(--verde); }
-.tab:hover:not(.active) { color: var(--verde2); background: var(--verde-light); }
-.badge { background: var(--amarelo); color: white; border-radius: 10px; padding: 1px 6px; font-size: .72rem; font-weight: 700; margin-left: 5px; }
+/* ── HEADER ── */
+header{background:var(--verde);color:white;padding:12px 18px;display:flex;align-items:center;gap:10px;box-shadow:var(--sombra);}
+header h1{font-size:1.1rem;font-weight:700;}
+.spacer{flex:1;}
+.user-chip{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.15);border-radius:20px;padding:5px 12px 5px 5px;cursor:pointer;transition:all .2s;}
+.user-chip:hover{background:rgba(255,255,255,.25);}
+.user-avatar{width:26px;height:26px;border-radius:50%;background:#fff3;display:flex;align-items:center;justify-content:center;font-size:.85rem;overflow:hidden;}
+.user-avatar img{width:100%;height:100%;border-radius:50%;}
+.user-name{font-size:.78rem;font-weight:600;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#69db7c;margin-left:2px;}
+.sync-dot.offline{background:#ffa94d;}
+.api-status{font-size:.75rem;padding:4px 10px;border-radius:20px;cursor:pointer;border:1.5px solid rgba(255,255,255,.4);transition:all .2s;background:rgba(255,255,255,.1);}
+.api-status.missing{background:rgba(231,111,81,.6);border-color:transparent;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
 
-.page { display: none; padding: 20px 22px; max-width: 1500px; margin: 0 auto; }
-.page.active { display: block; }
+/* ── TABS ── */
+.tabs{display:flex;background:white;border-bottom:2px solid var(--borda);padding:0 18px;gap:2px;overflow-x:auto;}
+.tab{padding:10px 15px;cursor:pointer;font-weight:600;font-size:.82rem;color:#666;border-bottom:3px solid transparent;transition:all .2s;white-space:nowrap;flex-shrink:0;}
+.tab.active{color:var(--verde);border-bottom-color:var(--verde);}
+.tab:hover:not(.active){color:var(--verde2);background:var(--verde-light);}
+.badge{background:var(--amarelo);color:white;border-radius:10px;padding:1px 6px;font-size:.7rem;font-weight:700;margin-left:4px;}
 
-/* CARDS */
-.card { background: white; border-radius: var(--radius); box-shadow: var(--sombra); overflow: hidden; }
-.card-header { background: var(--verde); color: white; padding: 11px 16px; font-weight: 700; font-size: .88rem; display: flex; align-items: center; gap: 8px; }
-.card-body { padding: 16px; }
+.page{display:none;padding:16px 18px;max-width:1500px;margin:0 auto;}
+.page.active{display:block;}
 
-/* BOTÕES */
-.btn { padding: 9px 16px; border: none; border-radius: 8px; font-weight: 700; font-size: .85rem; cursor: pointer; transition: all .2s; display: inline-flex; align-items: center; gap: 6px; }
-.btn-primary { background: var(--verde); color: white; }
-.btn-primary:hover { background: var(--verde2); transform: translateY(-1px); }
-.btn-ia { background: linear-gradient(135deg, #5b21b6, #7c3aed); color: white; }
-.btn-ia:hover { background: linear-gradient(135deg, #4c1d95, #6d28d9); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(124,58,237,0.3); }
-.btn-ia:disabled { background: #aaa; transform: none; box-shadow: none; cursor: not-allowed; }
-.btn-outline { background: white; color: var(--verde); border: 2px solid var(--verde); }
-.btn-outline:hover { background: var(--verde-bg); }
-.btn-danger { background: var(--laranja); color: white; }
-.btn-danger:hover { background: #d05a3f; }
-.btn-secondary { background: var(--amarelo); color: white; }
-.btn-secondary:hover { background: #e08b4f; }
-.btn-sm { padding: 6px 12px; font-size: .78rem; }
-.btn-full { width: 100%; justify-content: center; }
-.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+/* ── CARDS ── */
+.card{background:white;border-radius:var(--radius);box-shadow:var(--sombra);overflow:hidden;margin-bottom:16px;}
+.card-header{background:var(--verde);color:white;padding:11px 15px;font-weight:700;font-size:.87rem;display:flex;align-items:center;gap:7px;}
+.card-body{padding:15px;}
 
-/* FORM */
-.form-section { margin-bottom: 12px; }
-.form-section label { display: block; font-size: .77rem; font-weight: 700; color: #555; margin-bottom: 4px; text-transform: uppercase; letter-spacing: .4px; }
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
-input, select, textarea { width: 100%; padding: 8px 10px; border: 1.5px solid var(--borda); border-radius: 8px; font-size: .87rem; font-family: inherit; transition: border .2s; }
-input:focus, select:focus, textarea:focus { outline: none; border-color: var(--verde2); box-shadow: 0 0 0 3px rgba(64,145,108,.12); }
-input[readonly] { background: #f5f5f5; color: #666; }
+/* ── BOTÕES ── */
+.btn{padding:9px 15px;border:none;border-radius:8px;font-weight:700;font-size:.84rem;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:6px;}
+.btn-primary{background:var(--verde);color:white;}
+.btn-primary:hover{background:var(--verde2);}
+.btn-ia{background:linear-gradient(135deg,#5b21b6,#7c3aed);color:white;}
+.btn-ia:hover{background:linear-gradient(135deg,#4c1d95,#6d28d9);}
+.btn-ia:disabled{background:#aaa;cursor:not-allowed;}
+.btn-outline{background:white;color:var(--verde);border:2px solid var(--verde);}
+.btn-outline:hover{background:var(--verde-bg);}
+.btn-danger{background:var(--laranja);color:white;}
+.btn-secondary{background:var(--amarelo);color:white;}
+.btn-gps{background:linear-gradient(135deg,#0077b6,#0096c7);color:white;}
+.btn-gps:hover{background:linear-gradient(135deg,#005f90,#0077b6);}
+.btn-sm{padding:5px 11px;font-size:.77rem;}
+.btn-full{width:100%;justify-content:center;}
+.btn-group{display:flex;gap:8px;flex-wrap:wrap;margin-top:11px;}
+
+/* ── FORM ── */
+.form-section{margin-bottom:11px;}
+.form-section label{display:block;font-size:.75rem;font-weight:700;color:#555;margin-bottom:3px;text-transform:uppercase;letter-spacing:.4px;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+.form-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;}
+input,select,textarea{width:100%;padding:8px 10px;border:1.5px solid var(--borda);border-radius:8px;font-size:.86rem;font-family:inherit;transition:border .2s;}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--verde2);box-shadow:0 0 0 3px rgba(64,145,108,.12);}
+
+/* GPS */
+.gps-row{display:flex;gap:8px;align-items:flex-end;}
+.gps-row input{flex:1;}
+.gps-badge{background:#e0f2fe;color:#0077b6;border-radius:6px;padding:4px 8px;font-size:.75rem;font-weight:700;white-space:nowrap;}
+.coords-display{background:#f0faf3;border:1px solid var(--verde-bg);border-radius:8px;padding:8px 12px;font-size:.8rem;color:var(--verde);display:none;}
+.coords-display.show{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
 
 /* AUTOCOMPLETE */
-.autocomplete-wrap { position: relative; }
-.autocomplete-list { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1.5px solid var(--verde2); border-top: none; border-radius: 0 0 8px 8px; max-height: 200px; overflow-y: auto; z-index: 200; box-shadow: var(--sombra); display: none; }
-.autocomplete-item { padding: 8px 12px; cursor: pointer; font-size: .84rem; border-bottom: 1px solid #f0f0f0; }
-.autocomplete-item:hover, .autocomplete-item.sel { background: var(--verde-bg); }
-.autocomplete-item .sci { font-style: italic; color: #666; font-size: .77rem; }
+.autocomplete-wrap{position:relative;}
+.autocomplete-list{position:absolute;top:100%;left:0;right:0;background:white;border:1.5px solid var(--verde2);border-top:none;border-radius:0 0 8px 8px;max-height:190px;overflow-y:auto;z-index:200;box-shadow:var(--sombra);display:none;}
+.autocomplete-item{padding:8px 12px;cursor:pointer;font-size:.83rem;border-bottom:1px solid #f0f0f0;}
+.autocomplete-item:hover,.autocomplete-item.sel{background:var(--verde-bg);}
+.autocomplete-item .sci{font-style:italic;color:#666;font-size:.76rem;}
 
-/* ═══ FILA DE ANÁLISE (BATCH) ═══ */
-.batch-layout { display: grid; grid-template-columns: 1fr 420px; gap: 20px; align-items: start; }
-.drop-zone { border: 2.5px dashed var(--verde2); border-radius: var(--radius); padding: 36px 20px; text-align: center; color: var(--verde); cursor: pointer; transition: all .2s; background: var(--verde-light); }
-.drop-zone:hover, .drop-zone.drag { background: var(--verde-bg); border-color: var(--verde); }
-.drop-zone .icon { font-size: 2.8rem; margin-bottom: 8px; }
-.drop-zone p { font-weight: 700; font-size: .95rem; }
-.drop-zone small { color: #888; font-size: .78rem; }
+/* ── FILA BATCH ── */
+.batch-layout{display:grid;grid-template-columns:1fr 400px;gap:16px;align-items:start;}
+.drop-zone{border:2.5px dashed var(--verde2);border-radius:var(--radius);padding:30px 20px;text-align:center;color:var(--verde);cursor:pointer;background:var(--verde-light);transition:all .2s;}
+.drop-zone:hover,.drop-zone.drag{background:var(--verde-bg);}
+.drop-zone .icon{font-size:2.4rem;margin-bottom:6px;}
+.queue-grid{display:flex;flex-direction:column;gap:9px;max-height:65vh;overflow-y:auto;padding-right:3px;}
+.queue-card{border:1.5px solid var(--borda);border-radius:10px;overflow:hidden;background:white;transition:all .2s;cursor:pointer;}
+.queue-card.active-card{border-color:var(--verde2);box-shadow:0 0 0 3px rgba(64,145,108,.15);}
+.queue-card.done{border-color:#a8d5b5;background:#f8fff9;}
+.queue-card-top{display:flex;gap:9px;padding:9px;align-items:flex-start;}
+.queue-thumb{width:74px;height:52px;object-fit:cover;border-radius:6px;background:#111;flex-shrink:0;}
+.queue-info{flex:1;min-width:0;}
+.queue-filename{font-weight:700;font-size:.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.queue-meta{font-size:.73rem;color:var(--cinza);margin-top:2px;}
+.status-pill{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:.71rem;font-weight:700;}
+.pill-waiting{background:#f0f0f0;color:#666;}
+.pill-analyzing{background:#ede9fe;color:#5b21b6;}
+.pill-done{background:var(--verde-bg);color:var(--verde);}
+.pill-saved{background:#d1fae5;color:#065f46;}
+.pill-error{background:#fee2e2;color:#dc2626;}
+.spinner{display:inline-block;width:11px;height:11px;border:2px solid #c4b5fd;border-top-color:#7c3aed;border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ia-result{padding:9px 12px;background:#faf5ff;border-top:1px solid #e9d5ff;font-size:.8rem;}
+.ia-result .species-name{font-weight:700;font-size:.92rem;color:var(--verde);}
+.ia-tags{display:flex;flex-wrap:wrap;gap:3px;margin-top:4px;}
+.ia-tag{background:var(--verde-bg);color:var(--verde);padding:2px 6px;border-radius:10px;font-size:.7rem;font-weight:600;}
+.ia-tag.conf-alta{background:#d1fae5;color:#065f46;}
+.ia-tag.conf-media{background:#fef3c7;color:#92400e;}
+.ia-tag.conf-baixa{background:#fee2e2;color:#dc2626;}
 
-.queue-grid { display: flex; flex-direction: column; gap: 10px; max-height: 70vh; overflow-y: auto; padding-right: 4px; }
+/* FORMULÁRIO DIREITO */
+.form-panel{position:sticky;top:16px;}
+.form-preview{margin-bottom:12px;text-align:center;display:none;}
+.form-preview img,.form-preview video{max-width:100%;max-height:170px;border-radius:8px;object-fit:contain;}
+.ia-banner{background:#faf5ff;border:1.5px solid #e9d5ff;border-radius:8px;padding:9px 12px;margin-bottom:10px;display:none;}
 
-.queue-card { border: 1.5px solid var(--borda); border-radius: 10px; overflow: hidden; background: white; transition: all .2s; }
-.queue-card.active-card { border-color: var(--verde2); box-shadow: 0 0 0 3px rgba(64,145,108,.15); }
-.queue-card.done { border-color: #a8d5b5; background: #f8fff9; }
-.queue-card.error-card { border-color: #f5a0a0; background: #fff8f8; }
+/* ── MAPA ── */
+#mapaContainer{height:450px;border-radius:var(--radius);overflow:hidden;box-shadow:var(--sombra);}
+.mapa-grid{display:grid;grid-template-columns:1fr 320px;gap:16px;align-items:start;}
+.pontos-list{max-height:450px;overflow-y:auto;}
+.ponto-item{border:1px solid var(--borda);border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:.82rem;cursor:pointer;transition:all .2s;}
+.ponto-item:hover{background:var(--verde-light);border-color:var(--verde2);}
+.ponto-item.ativo{border-color:var(--verde);background:var(--verde-light);}
+.ponto-item.inativo{opacity:.6;}
+.ponto-nome{font-weight:700;color:var(--verde);}
+.ponto-coords{font-size:.74rem;color:#666;font-family:monospace;}
 
-.queue-card-top { display: flex; gap: 10px; padding: 10px; align-items: flex-start; cursor: pointer; }
-.queue-thumb { width: 80px; height: 56px; object-fit: cover; border-radius: 6px; background: #111; flex-shrink: 0; }
-.queue-thumb-video { width: 80px; height: 56px; flex-shrink: 0; position: relative; }
-.queue-thumb-video video { width: 100%; height: 100%; object-fit: cover; border-radius: 6px; }
-.queue-info { flex: 1; min-width: 0; }
-.queue-filename { font-weight: 700; font-size: .82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.queue-meta { font-size: .76rem; color: var(--cinza); margin-top: 2px; }
+/* ── GESTÃO ── */
+.gestao-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
 
-.status-pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 20px; font-size: .73rem; font-weight: 700; white-space: nowrap; }
-.pill-waiting { background: #f0f0f0; color: #666; }
-.pill-analyzing { background: #ede9fe; color: #5b21b6; }
-.pill-done { background: var(--verde-bg); color: var(--verde); }
-.pill-error { background: #fee2e2; color: #dc2626; }
-.pill-saved { background: #d1fae5; color: #065f46; }
+/* ── TABELA ── */
+.table-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:.79rem;}
+th{background:var(--verde);color:white;padding:7px 9px;text-align:left;font-size:.74rem;text-transform:uppercase;white-space:nowrap;}
+td{padding:6px 9px;border-bottom:1px solid var(--borda);vertical-align:middle;}
+tr:hover td{background:var(--verde-light);}
+td i{font-style:italic;color:#555;}
+.del-btn{background:none;border:none;color:#dc3545;cursor:pointer;font-size:.9rem;padding:2px 5px;border-radius:4px;}
+.del-btn:hover{background:#fee2e2;}
+.conf-badge{padding:2px 6px;border-radius:10px;font-size:.7rem;font-weight:700;}
+.conf-alta{background:#d1fae5;color:#065f46;}
+.conf-media{background:#fef3c7;color:#92400e;}
+.conf-baixa{background:#fee2e2;color:#dc2626;}
 
-.spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid #c4b5fd; border-top-color: #7c3aed; border-radius: 50%; animation: spin .7s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
+/* ── CONFIG ── */
+.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:960px;}
+.api-key-wrap{position:relative;}
+.api-key-wrap input{padding-right:40px;font-family:monospace;font-size:.83rem;}
+.toggle-eye{position:absolute;right:9px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1rem;color:#888;}
+.info-box{background:var(--verde-light);border:1px solid var(--verde-bg);border-radius:8px;padding:11px 14px;font-size:.81rem;color:var(--verde);line-height:1.5;margin-bottom:12px;}
+.warning-box{background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:11px 14px;font-size:.81rem;color:#92400e;line-height:1.5;margin-top:12px;}
+.step-box{background:#f8f9fa;border:1px solid var(--borda);border-radius:8px;padding:12px 14px;font-size:.81rem;line-height:1.8;margin-bottom:12px;counter-reset:step;}
+.step-box li{list-style:none;padding-left:4px;}
+.step-box li::before{content:counter(step) ". ";counter-increment:step;font-weight:700;color:var(--verde);}
 
-/* Resultado da IA */
-.ia-result { padding: 10px 12px; background: #faf5ff; border-top: 1px solid #e9d5ff; font-size: .82rem; }
-.ia-result .species-name { font-weight: 700; font-size: .95rem; color: var(--verde); }
-.ia-result .species-sci { font-style: italic; color: #555; font-size: .82rem; }
-.ia-result .ia-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
-.ia-tag { background: var(--verde-bg); color: var(--verde); padding: 2px 7px; border-radius: 12px; font-size: .72rem; font-weight: 600; }
-.ia-tag.conf-alta { background: #d1fae5; color: #065f46; }
-.ia-tag.conf-media { background: #fef3c7; color: #92400e; }
-.ia-tag.conf-baixa { background: #fee2e2; color: #dc2626; }
-.ia-notes { color: #666; margin-top: 4px; font-style: italic; }
+/* ── MODAL BATCH ── */
+#batchModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;align-items:center;justify-content:center;}
+#batchModal.show{display:flex;}
+.modal-box{background:white;border-radius:var(--radius);padding:26px;max-width:440px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+.progress-bar-wrap{background:#f0f0f0;border-radius:20px;height:9px;margin:14px 0;overflow:hidden;}
+.progress-bar{height:100%;background:linear-gradient(90deg,var(--verde),var(--verde2));border-radius:20px;transition:width .3s;}
 
-/* Painel do formulário direito */
-.form-panel .card-header { justify-content: space-between; }
-.form-panel { position: sticky; top: 16px; }
+/* ── TOAST ── */
+#toast{position:fixed;bottom:20px;right:20px;background:var(--verde);color:white;padding:11px 16px;border-radius:10px;font-size:.85rem;font-weight:600;opacity:0;transform:translateY(10px);transition:all .3s;z-index:9999;pointer-events:none;display:flex;align-items:center;gap:7px;max-width:320px;}
+#toast.show{opacity:1;transform:translateY(0);}
+#toast.warn{background:#e76f51;}
 
-/* TABELA */
-.table-wrap { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; font-size: .8rem; }
-th { background: var(--verde); color: white; padding: 8px 10px; text-align: left; font-size: .76rem; text-transform: uppercase; white-space: nowrap; }
-td { padding: 7px 10px; border-bottom: 1px solid var(--borda); vertical-align: middle; }
-tr:hover td { background: var(--verde-light); }
-tr:nth-child(even) td { background: #fafcfa; }
-td i { font-style: italic; color: #555; }
-.del-btn { background: none; border: none; color: #dc3545; cursor: pointer; font-size: .95rem; padding: 2px 5px; border-radius: 4px; }
-.del-btn:hover { background: #fee2e2; }
-.conf-badge { padding: 2px 7px; border-radius: 12px; font-size: .72rem; font-weight: 700; }
-.conf-alta { background: #d1fae5; color: #065f46; }
-.conf-media { background: #fef3c7; color: #92400e; }
-.conf-baixa { background: #fee2e2; color: #dc2626; }
+/* ── SYNC INDICATOR ── */
+.sync-saving{font-size:.72rem;color:var(--amarelo);display:none;align-items:center;gap:4px;}
+.sync-saving.show{display:flex;}
 
-/* GESTÃO */
-.gestao-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-
-/* CONFIGURAÇÕES */
-.settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 900px; }
-.api-key-wrap { position: relative; }
-.api-key-wrap input { padding-right: 42px; font-family: monospace; font-size: .85rem; }
-.toggle-eye { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 1.1rem; color: #888; }
-.info-box { background: var(--verde-light); border: 1px solid var(--verde-bg); border-radius: 8px; padding: 12px 16px; font-size: .83rem; color: var(--verde); line-height: 1.5; }
-.warning-box { background: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px; padding: 12px 16px; font-size: .83rem; color: #92400e; line-height: 1.5; }
-
-/* MODAL PROGRESSO BATCH */
-#batchModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9000; align-items: center; justify-content: center; }
-#batchModal.show { display: flex; }
-.modal-box { background: white; border-radius: var(--radius); padding: 28px; max-width: 460px; width: 90%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
-.modal-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 12px; }
-.progress-bar-wrap { background: #f0f0f0; border-radius: 20px; height: 10px; margin: 16px 0; overflow: hidden; }
-.progress-bar { height: 100%; background: linear-gradient(90deg, var(--verde), var(--verde2)); border-radius: 20px; transition: width .3s; }
-.modal-status { font-size: .85rem; color: #555; min-height: 20px; }
-
-/* TOAST */
-#toast { position: fixed; bottom: 24px; right: 24px; background: var(--verde); color: white; padding: 12px 18px; border-radius: 10px; font-size: .87rem; font-weight: 600; opacity: 0; transform: translateY(10px); transition: all .3s; z-index: 9999; pointer-events: none; display: flex; align-items: center; gap: 8px; max-width: 340px; }
-#toast.show { opacity: 1; transform: translateY(0); }
-#toast.warn { background: #e76f51; }
-
-@media (max-width:900px) {
-  .batch-layout, .gestao-grid, .settings-grid { grid-template-columns: 1fr; }
+@media(max-width:860px){
+  .batch-layout,.gestao-grid,.settings-grid,.mapa-grid{grid-template-columns:1fr;}
+  .form-panel{position:static;}
+  #mapaContainer{height:300px;}
 }
 </style>
 </head>
 <body>
 
+<!-- ══════════════ LOGIN OVERLAY ══════════════ -->
+<div id="loginOverlay">
+  <div class="login-box">
+    <div class="login-logo">🌿</div>
+    <div class="login-title">Camera Trap</div>
+    <div class="login-subtitle">Registro Inteligente de Campo<br>Faça login para sincronizar seus dados em todos os dispositivos</div>
+
+    <button class="btn-google" id="btnGoogleLogin" onclick="loginGoogle()">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
+      Entrar com Google
+    </button>
+
+    <div class="login-divider">ou</div>
+
+    <button class="btn-local" onclick="loginLocal()">
+      Continuar sem login (dados apenas neste dispositivo)
+    </button>
+
+    <div class="login-note">Ao entrar com Google, seus dados ficam salvos na nuvem e sincronizam automaticamente entre celular e computador.</div>
+
+    <div id="loginError" style="margin-top:12px;font-size:.8rem;color:#dc2626;display:none"></div>
+    <div id="loginSetupNotice" style="margin-top:12px;font-size:.78rem;color:#888;display:none">
+      ⚙️ Firebase não configurado. <a href="#" onclick="loginLocal();setTimeout(()=>showTab('config'),300)" style="color:var(--verde)">Configure em ⚙️ Config</a> para ativar o login.
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ HEADER ══════════════ -->
 <header>
-  <span style="font-size:1.4rem">🌿</span>
+  <span style="font-size:1.3rem">🌿</span>
   <h1>Camera Trap</h1>
-  <span class="subtitle">Registro Inteligente de Campo</span>
   <div class="spacer"></div>
-  <button class="api-status" id="apiStatusBtn" onclick="showTab('config')">⚙️ Configurar API</button>
+  <span class="sync-saving" id="syncSaving"><span class="spinner" style="border-color:#ffd700;border-top-color:#fff"></span> Salvando...</span>
+  <div id="userChip" class="user-chip" onclick="menuUsuario()" style="display:none">
+    <div class="user-avatar" id="userAvatar">👤</div>
+    <span class="user-name" id="userName">Usuário</span>
+    <div class="sync-dot" id="syncDot"></div>
+  </div>
+  <button class="api-status" id="apiStatusBtn" onclick="showTab('config')">⚙️ IA</button>
 </header>
 
+<!-- ══════════════ TABS ══════════════ -->
 <div class="tabs">
-  <div class="tab active" onclick="showTab('analise')">🤖 Análise com IA <span class="badge" id="badgeFila">0</span></div>
-  <div class="tab" onclick="showTab('gestao')">🔄 Gestão de Câmeras <span class="badge" id="badgeGestao">0</span></div>
+  <div class="tab active" onclick="showTab('analise')">🤖 IA <span class="badge" id="badgeFila">0</span></div>
+  <div class="tab" onclick="showTab('mapa')">🗺 Mapa <span class="badge" id="badgePontos">0</span></div>
+  <div class="tab" onclick="showTab('gestao')">🔄 Câmeras <span class="badge" id="badgeGestao">0</span></div>
   <div class="tab" onclick="showTab('tabela')">📋 Tabela <span class="badge" id="badgeTabela">0</span></div>
   <div class="tab" onclick="showTab('config')">⚙️ Config</div>
 </div>
 
-<!-- ══════════════════════════════════════════════
-     ABA 1: ANÁLISE COM IA
-══════════════════════════════════════════════ -->
+<!-- ══════════════ ABA: ANÁLISE COM IA ══════════════ -->
 <div id="tab-analise" class="page active">
   <div class="batch-layout">
-
-    <!-- Esquerda: fila de arquivos -->
     <div>
-      <div class="card" style="margin-bottom:16px">
+      <div class="card">
         <div class="card-header">
           📁 Fila de Análise
-          <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
-            <button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:white;border:1px solid rgba(255,255,255,.3)" onclick="limparFila()">🗑 Limpar fila</button>
-            <button class="btn btn-sm btn-ia" id="btnBatchAll" onclick="analisarTodos()" style="padding:5px 12px;font-size:.78rem">🤖 Analisar Todos</button>
+          <div style="margin-left:auto;display:flex;gap:7px">
+            <button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:white;border:1px solid rgba(255,255,255,.3)" onclick="limparFila()">🗑 Limpar</button>
+            <button class="btn btn-sm btn-ia" onclick="analisarTodos()" style="padding:4px 11px;font-size:.76rem">🤖 Analisar Todos</button>
           </div>
         </div>
         <div class="card-body">
           <input type="file" id="fileInput" accept="image/*,video/*" multiple style="display:none" onchange="adicionarArquivos(this.files)">
           <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
             <div class="icon">📸</div>
-            <p>Clique ou arraste fotos e vídeos aqui</p>
-            <small>JPG · PNG · MP4 · AVI · MOV — pode selecionar vários de uma vez</small>
+            <p style="font-weight:700;font-size:.92rem">Clique ou arraste fotos e vídeos aqui</p>
+            <small style="color:#888;font-size:.75rem">JPG · PNG · MP4 · AVI · MOV — vários de uma vez</small>
           </div>
-
-          <div id="queueContainer" style="margin-top:12px">
-            <div id="emptyQueue" style="text-align:center;color:#aaa;font-size:.85rem;padding:16px;font-style:italic">Nenhum arquivo na fila.</div>
+          <div id="queueContainer" style="margin-top:11px">
+            <div id="emptyQueue" style="text-align:center;color:#aaa;font-size:.83rem;padding:14px;font-style:italic">Nenhum arquivo na fila.</div>
             <div class="queue-grid" id="queueGrid"></div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Direita: formulário de edição / confirmação -->
+    <!-- Formulário direito -->
     <div class="form-panel">
       <div class="card">
-        <div class="card-header">
-          ✏️ <span id="formTitle">Editar e Confirmar</span>
-          <div style="margin-left:auto">
-            <span id="formFilename" style="font-size:.73rem;opacity:.8;font-weight:normal"></span>
-          </div>
+        <div class="card-header">✏️ Editar e Confirmar
+          <span id="formFilename" style="font-size:.71rem;opacity:.8;font-weight:normal;margin-left:auto"></span>
         </div>
         <div class="card-body">
-          <!-- Preview -->
-          <div id="formPreview" style="margin-bottom:14px;display:none;text-align:center">
-            <img id="previewImg" style="max-width:100%;max-height:180px;border-radius:8px;object-fit:contain;display:none">
-            <video id="previewVideo" controls style="max-width:100%;max-height:180px;border-radius:8px;display:none"></video>
+          <div class="form-preview" id="formPreview">
+            <img id="previewImg" style="display:none">
+            <video id="previewVideo" controls style="display:none"></video>
           </div>
-
-          <!-- IA Banner -->
-          <div id="iaBanner" style="display:none;background:#faf5ff;border:1.5px solid #e9d5ff;border-radius:8px;padding:10px 12px;margin-bottom:12px">
-            <div style="font-size:.8rem;font-weight:700;color:#5b21b6;margin-bottom:4px">🤖 Identificado pela IA</div>
-            <div id="iaBannerContent" style="font-size:.82rem;color:#444"></div>
-            <div style="font-size:.75rem;color:#888;margin-top:4px">Revise os campos abaixo e clique em Salvar</div>
+          <div class="ia-banner" id="iaBanner">
+            <div style="font-size:.78rem;font-weight:700;color:#5b21b6;margin-bottom:3px">🤖 Identificado pela IA</div>
+            <div id="iaBannerContent" style="font-size:.8rem;color:#444"></div>
           </div>
 
           <div class="form-row" style="margin-bottom:10px">
             <div class="form-section">
               <label>📷 Câmera</label>
-              <input type="text" id="f_camera" placeholder="CAM01" list="camerasList">
-              <datalist id="camerasList"></datalist>
+              <select id="f_camera" onchange="preencherCoordsDaCamera()">
+                <option value="">— selecione —</option>
+              </select>
             </div>
-            <div class="form-section">
-              <label>📍 Ponto / Local</label>
-              <input type="text" id="f_ponto" placeholder="Trilha Norte" list="pontosList">
-              <datalist id="pontosList"></datalist>
-            </div>
-          </div>
-
-          <div class="form-row" style="margin-bottom:10px">
             <div class="form-section">
               <label>📅 Data</label>
               <input type="date" id="f_data">
             </div>
+          </div>
+
+          <!-- Coordenadas auto da câmera -->
+          <div class="coords-display" id="coordsDisplay">
+            <span>📍</span>
+            <span id="coordsLat"></span>
+            <span id="coordsLng"></span>
+            <span id="coordsAlt" style="color:#888"></span>
+          </div>
+
+          <div class="form-row" style="margin-bottom:10px;margin-top:10px">
             <div class="form-section">
               <label>⏰ Horário</label>
               <input type="time" id="f_hora">
             </div>
+            <div class="form-section">
+              <label>👤 Observador</label>
+              <input type="text" id="f_observador" list="observadoresList">
+              <datalist id="observadoresList"></datalist>
+            </div>
           </div>
 
           <div class="form-section" style="margin-bottom:10px">
-            <label>🦜 Espécie (nome popular)</label>
+            <label>🦜 Espécie</label>
             <div class="autocomplete-wrap">
               <input type="text" id="f_nome_popular" placeholder="ex: Onça-pintada" autocomplete="off" oninput="buscaEspecie(this.value)">
               <div class="autocomplete-list" id="autocompleteList"></div>
@@ -273,64 +342,43 @@ td i { font-style: italic; color: #555; }
 
           <div class="form-section" style="margin-bottom:10px">
             <label>🔬 Nome Científico</label>
-            <input type="text" id="f_nome_cientifico" placeholder="preenchido automaticamente" style="font-style:italic">
+            <input type="text" id="f_nome_cientifico" style="font-style:italic">
           </div>
 
           <div class="form-row-3" style="margin-bottom:10px">
-            <div class="form-section">
-              <label>🔢 Nº Ind.</label>
-              <input type="number" id="f_individuos" min="1" value="1">
+            <div class="form-section"><label>🔢 Nº</label><input type="number" id="f_individuos" min="1" value="1"></div>
+            <div class="form-section"><label>⚥ Sexo</label>
+              <select id="f_sexo"><option value="">—</option><option>Macho</option><option>Fêmea</option><option>Indeterminado</option></select>
             </div>
-            <div class="form-section">
-              <label>⚥ Sexo</label>
-              <select id="f_sexo">
-                <option value="">—</option>
-                <option>Macho</option><option>Fêmea</option><option>Indeterminado</option>
-              </select>
-            </div>
-            <div class="form-section">
-              <label>🐣 Idade</label>
-              <select id="f_idade">
-                <option value="">—</option>
-                <option>Adulto</option><option>Jovem</option><option>Filhote</option><option>Indeterminado</option>
-              </select>
+            <div class="form-section"><label>🐣 Idade</label>
+              <select id="f_idade"><option value="">—</option><option>Adulto</option><option>Jovem</option><option>Filhote</option><option>Indeterminado</option></select>
             </div>
           </div>
 
           <div class="form-section" style="margin-bottom:10px">
             <label>🏃 Comportamento</label>
             <select id="f_comportamento">
-              <option value="">—</option>
-              <option>Passagem</option><option>Forrageamento / Alimentação</option><option>Descanso</option>
-              <option>Marcação de território</option><option>Cuidado parental</option>
-              <option>Interação social</option><option>Predação</option><option>Fuga</option>
-              <option>Vocalizando</option><option>Outro</option>
+              <option value="">—</option><option>Passagem</option><option>Forrageamento / Alimentação</option>
+              <option>Descanso</option><option>Marcação de território</option><option>Cuidado parental</option>
+              <option>Interação social</option><option>Predação</option><option>Fuga</option><option>Outro</option>
             </select>
-          </div>
-
-          <div class="form-section" style="margin-bottom:10px">
-            <label>👤 Observador</label>
-            <input type="text" id="f_observador" placeholder="Seu nome" list="observadoresList">
-            <datalist id="observadoresList"></datalist>
           </div>
 
           <div class="form-section" style="margin-bottom:6px">
             <label>📝 Observações</label>
-            <textarea id="f_obs" rows="2" placeholder="notas adicionais..."></textarea>
+            <textarea id="f_obs" rows="2" placeholder="notas..."></textarea>
           </div>
 
-          <input type="hidden" id="f_arquivo">
-          <input type="hidden" id="f_confianca">
-          <input type="hidden" id="f_currentIdx">
+          <input type="hidden" id="f_arquivo"><input type="hidden" id="f_confianca"><input type="hidden" id="f_currentIdx">
 
           <div class="btn-group">
-            <button class="btn btn-primary btn-full" id="btnSalvarReg" onclick="salvarRegistroAtual()">✅ Confirmar e Salvar</button>
+            <button class="btn btn-primary btn-full" onclick="salvarRegistroAtual()">✅ Confirmar e Salvar</button>
           </div>
           <div class="btn-group">
             <button class="btn btn-ia btn-full" id="btnAnalisarItem" onclick="analisarItemAtual()" disabled>🤖 Analisar com IA</button>
           </div>
           <div class="btn-group">
-            <button class="btn btn-outline" style="flex:1" onclick="limparFormSem()">🗑 Limpar campos</button>
+            <button class="btn btn-outline" style="flex:1" onclick="limparFormSem()">🗑 Limpar</button>
             <button class="btn btn-secondary" style="flex:1" onclick="proximoItem()">Próximo ➡</button>
           </div>
         </div>
@@ -339,9 +387,99 @@ td i { font-style: italic; color: #555; }
   </div>
 </div>
 
-<!-- ══════════════════════════════════════════════
-     ABA 2: GESTÃO DE CÂMERAS
-══════════════════════════════════════════════ -->
+<!-- ══════════════ ABA: MAPA ══════════════ -->
+<div id="tab-mapa" class="page">
+  <div class="mapa-grid">
+    <div>
+      <div class="card">
+        <div class="card-header">🗺 Pontos das Câmeras Trap
+          <div style="margin-left:auto;font-size:.75rem;opacity:.8" id="mapaInfo"></div>
+        </div>
+        <div id="mapaContainer"></div>
+      </div>
+    </div>
+
+    <div>
+      <!-- Cadastrar ponto -->
+      <div class="card">
+        <div class="card-header">📍 Cadastrar / Editar Ponto</div>
+        <div class="card-body">
+          <div class="form-section">
+            <label>📷 ID da Câmera / Nome do Ponto</label>
+            <input type="text" id="p_nome" placeholder="ex: CAM01 — Trilha Norte">
+          </div>
+
+          <div class="form-section">
+            <label>📍 Coordenadas GPS</label>
+            <div class="gps-row">
+              <div style="flex:1">
+                <input type="number" id="p_lat" placeholder="Latitude (-23.5489)" step="0.000001">
+              </div>
+              <div style="flex:1">
+                <input type="number" id="p_lng" placeholder="Longitude (-46.6388)" step="0.000001">
+              </div>
+            </div>
+            <div style="display:flex;gap:7px;margin-top:7px">
+              <button class="btn btn-gps btn-sm" onclick="capturarGPS('p_lat','p_lng','p_alt','gpsPontoStatus')" style="flex:1">
+                📡 Capturar GPS Agora
+              </button>
+              <button class="btn btn-outline btn-sm" onclick="colarDoMapa()" style="flex:1">
+                📋 Colar do Maps
+              </button>
+            </div>
+            <div id="gpsPontoStatus" style="font-size:.76rem;margin-top:5px;color:var(--verde);display:none"></div>
+          </div>
+
+          <div class="form-section">
+            <label>⛰ Altitude (metros) <span style="font-weight:normal;color:#aaa">opcional</span></label>
+            <input type="number" id="p_alt" placeholder="ex: 850">
+          </div>
+
+          <div class="form-section">
+            <label>🌿 Bioma / Habitat</label>
+            <select id="p_bioma">
+              <option value="">—</option>
+              <option>Mata Atlântica</option><option>Cerrado</option><option>Pantanal</option>
+              <option>Amazônia</option><option>Caatinga</option><option>Pampa</option>
+              <option>Área de transição</option><option>Pastagem</option><option>Borda de mata</option>
+            </select>
+          </div>
+
+          <div class="form-section">
+            <label>⚙️ Status</label>
+            <select id="p_status">
+              <option value="ativo">🟢 Ativo</option>
+              <option value="inativo">🔴 Inativo / Desativado</option>
+              <option value="manutencao">🟡 Em manutenção</option>
+            </select>
+          </div>
+
+          <div class="form-section">
+            <label>📝 Notas do Ponto</label>
+            <textarea id="p_notas" rows="2" placeholder="descrição do local, infraestrutura..."></textarea>
+          </div>
+
+          <div class="btn-group">
+            <button class="btn btn-primary btn-full" onclick="salvarPonto()">✅ Salvar Ponto</button>
+          </div>
+          <div class="btn-group">
+            <button class="btn btn-outline btn-full" onclick="limparFormPonto()">🗑 Limpar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lista de pontos -->
+      <div class="card">
+        <div class="card-header">📋 Pontos Cadastrados</div>
+        <div class="card-body pontos-list" id="pontosList">
+          <div style="color:#aaa;font-size:.82rem;font-style:italic">Nenhum ponto cadastrado.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ ABA: GESTÃO ══════════════ -->
 <div id="tab-gestao" class="page">
   <div class="gestao-grid">
     <div class="card">
@@ -349,28 +487,42 @@ td i { font-style: italic; color: #555; }
       <div class="card-body">
         <div class="form-row" style="margin-bottom:10px">
           <div class="form-section"><label>📅 Data</label><input type="date" id="g_data"></div>
-          <div class="form-section"><label>📷 Câmera</label><input type="text" id="g_camera" placeholder="CAM01" list="camerasList3"><datalist id="camerasList3"></datalist></div>
+          <div class="form-section"><label>📷 Câmera</label>
+            <select id="g_camera"><option value="">— selecione —</option></select>
+          </div>
         </div>
-        <div class="form-section" style="margin-bottom:10px"><label>📍 Ponto / Local</label><input type="text" id="g_ponto" placeholder="Trilha Norte" list="pontosList3"><datalist id="pontosList3"></datalist></div>
         <div class="form-section" style="margin-bottom:10px">
           <label>⚙️ Tipo de Evento</label>
           <select id="g_tipo" onchange="toggleGestaoFields()">
             <option value="">Selecione...</option>
-            <option value="instalacao">🆕 Instalação de câmera nova</option>
-            <option value="troca">🔄 Troca de câmera no ponto</option>
-            <option value="retirada">📤 Retirada (ponto continua ativo)</option>
+            <option value="instalacao">🆕 Instalação</option>
+            <option value="troca">🔄 Troca de câmera</option>
+            <option value="retirada">📤 Retirada</option>
             <option value="desativacao">🔴 Desativação do ponto</option>
-            <option value="manutencao">🔧 Manutenção / Verificação</option>
-            <option value="falha">⚠️ Falha / Problema técnico</option>
+            <option value="manutencao">🔧 Manutenção</option>
+            <option value="falha">⚠️ Falha técnica</option>
           </select>
         </div>
-        <div id="g_novaCamera_wrap" class="form-section" style="display:none;margin-bottom:10px"><label>📷 Nova Câmera (ID)</label><input type="text" id="g_nova_camera" placeholder="ID da nova câmera"></div>
-        <div class="form-row" style="margin-bottom:10px">
-          <div class="form-section"><label>💾 SD Card</label><select id="g_sd"><option value="">—</option><option>Trocado</option><option>Verificado OK</option><option>Corrompido</option><option>Cheio</option></select></div>
-          <div class="form-section"><label>🔋 Bateria</label><select id="g_bateria"><option value="">—</option><option>Trocada</option><option>OK</option><option>Fraca</option><option>Sem bateria</option></select></div>
+        <div id="g_novaCamera_wrap" class="form-section" style="display:none;margin-bottom:10px">
+          <label>📷 Nova Câmera (ID)</label>
+          <input type="text" id="g_nova_camera">
         </div>
-        <div class="form-section" style="margin-bottom:10px"><label>👤 Responsável</label><input type="text" id="g_responsavel" list="observadoresList3"><datalist id="observadoresList3"></datalist></div>
-        <div class="form-section" style="margin-bottom:6px"><label>📝 Observações</label><textarea id="g_obs" rows="3" placeholder="condições do local, problemas..."></textarea></div>
+        <div class="form-row" style="margin-bottom:10px">
+          <div class="form-section"><label>💾 SD Card</label>
+            <select id="g_sd"><option value="">—</option><option>Trocado</option><option>Verificado OK</option><option>Corrompido</option><option>Cheio</option></select>
+          </div>
+          <div class="form-section"><label>🔋 Bateria</label>
+            <select id="g_bateria"><option value="">—</option><option>Trocada</option><option>OK</option><option>Fraca</option><option>Sem bateria</option></select>
+          </div>
+        </div>
+        <div class="form-section" style="margin-bottom:10px">
+          <label>👤 Responsável</label>
+          <input type="text" id="g_responsavel" list="observadoresList2"><datalist id="observadoresList2"></datalist>
+        </div>
+        <div class="form-section" style="margin-bottom:6px">
+          <label>📝 Observações</label>
+          <textarea id="g_obs" rows="3" placeholder="condições do local, problemas..."></textarea>
+        </div>
         <div class="btn-group">
           <button class="btn btn-primary btn-full" onclick="salvarGestao()">✅ Salvar Evento</button>
         </div>
@@ -381,87 +533,120 @@ td i { font-style: italic; color: #555; }
     </div>
     <div class="card">
       <div class="card-header">📜 Histórico Recente</div>
-      <div class="card-body"><div id="gestaoList" style="font-size:.83rem;color:#aaa;font-style:italic">Nenhum evento registrado.</div></div>
+      <div class="card-body"><div id="gestaoList" style="font-size:.82rem;color:#aaa;font-style:italic">Nenhum evento.</div></div>
     </div>
   </div>
 </div>
 
-<!-- ══════════════════════════════════════════════
-     ABA 3: TABELA COMPLETA
-══════════════════════════════════════════════ -->
+<!-- ══════════════ ABA: TABELA ══════════════ -->
 <div id="tab-tabela" class="page">
   <div class="card">
     <div class="card-header">
       📊 Todos os Registros
-      <div style="margin-left:auto;display:flex;gap:8px">
+      <div style="margin-left:auto;display:flex;gap:7px">
         <button class="btn btn-sm" style="background:white;color:var(--verde)" onclick="exportarCSV()">📥 CSV</button>
         <button class="btn btn-sm" style="background:var(--amarelo);color:white" onclick="exportarExcel()">📊 Excel</button>
-        <button class="btn btn-sm btn-danger" onclick="limparTudo()">🗑 Limpar Tudo</button>
+        <button class="btn btn-sm btn-danger" onclick="limparTudo()">🗑 Limpar</button>
       </div>
     </div>
     <div class="card-body">
-      <div style="background:var(--verde-bg);color:var(--verde);border-radius:8px;padding:8px 14px;font-size:.84rem;font-weight:700;margin-bottom:14px;display:flex;justify-content:space-between">
-        <span id="countLabel">0 registros · 0 eventos</span>
+      <div style="background:var(--verde-bg);color:var(--verde);border-radius:8px;padding:7px 12px;font-size:.83rem;font-weight:700;margin-bottom:12px">
+        <span id="countLabel">0 registros · 0 eventos · 0 pontos</span>
       </div>
-      <h3 style="font-size:.83rem;color:var(--verde);margin-bottom:8px;font-weight:700">🦜 REGISTROS DE ESPÉCIES</h3>
-      <div class="table-wrap" style="margin-bottom:20px">
-        <table>
-          <thead><tr><th>#</th><th>Data</th><th>Hora</th><th>Câmera</th><th>Ponto</th><th>Espécie</th><th>Nome Científico</th><th>Nº</th><th>Sexo</th><th>Idade</th><th>Comportamento</th><th>IA Confiança</th><th>Arquivo</th><th>Observador</th><th>Obs</th><th></th></tr></thead>
-          <tbody id="tabelaBody"></tbody>
-        </table>
+      <h3 style="font-size:.82rem;color:var(--verde);margin-bottom:7px;font-weight:700">🦜 REGISTROS DE ESPÉCIES</h3>
+      <div class="table-wrap" style="margin-bottom:18px">
+        <table><thead><tr><th>#</th><th>Data</th><th>Hora</th><th>Câmera</th><th>Lat</th><th>Lng</th><th>Espécie</th><th>Nome Científico</th><th>Nº</th><th>Sexo</th><th>Idade</th><th>Comportamento</th><th>IA</th><th>Arquivo</th><th>Obs</th><th></th></tr></thead>
+        <tbody id="tabelaBody"></tbody></table>
       </div>
-      <h3 style="font-size:.83rem;color:var(--verde);margin-bottom:8px;font-weight:700">🔄 EVENTOS DE CÂMERA</h3>
+      <h3 style="font-size:.82rem;color:var(--verde);margin-bottom:7px;font-weight:700">🗺 PONTOS DE CÂMERA</h3>
+      <div class="table-wrap" style="margin-bottom:18px">
+        <table><thead><tr><th>#</th><th>Nome</th><th>Latitude</th><th>Longitude</th><th>Altitude</th><th>Bioma</th><th>Status</th><th>Notas</th><th></th></tr></thead>
+        <tbody id="pontosBody"></tbody></table>
+      </div>
+      <h3 style="font-size:.82rem;color:var(--verde);margin-bottom:7px;font-weight:700">🔄 EVENTOS DE CÂMERA</h3>
       <div class="table-wrap">
-        <table>
-          <thead><tr><th>#</th><th>Data</th><th>Câmera</th><th>Ponto</th><th>Evento</th><th>Nova Câmera</th><th>SD</th><th>Bateria</th><th>Responsável</th><th>Obs</th><th></th></tr></thead>
-          <tbody id="gestaoBody"></tbody>
-        </table>
+        <table><thead><tr><th>#</th><th>Data</th><th>Câmera</th><th>Evento</th><th>SD</th><th>Bateria</th><th>Responsável</th><th>Obs</th><th></th></tr></thead>
+        <tbody id="gestaoBody"></tbody></table>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ══════════════════════════════════════════════
-     ABA 4: CONFIGURAÇÕES
-══════════════════════════════════════════════ -->
+<!-- ══════════════ ABA: CONFIG ══════════════ -->
 <div id="tab-config" class="page">
   <div class="settings-grid">
+    <!-- Gemini API -->
     <div class="card">
-      <div class="card-header">🔑 Chave API do Google Gemini (gratuito)</div>
+      <div class="card-header">🤖 API Google Gemini (IA gratuita)</div>
       <div class="card-body">
-        <div class="info-box" style="margin-bottom:14px">
-          A identificação automática de espécies usa o Google Gemini — <b>completamente gratuito</b> para até 1.500 análises por dia.<br><br>
-          👉 Crie sua chave gratuita em: <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--verde);font-weight:700">aistudio.google.com/apikey</a><br>
-          <span style="font-size:.78rem;color:#555">Clique em "Create API Key" → copie e cole abaixo. É grátis, não precisa de cartão.</span>
+        <div class="info-box">
+          Identificação automática de espécies — <b>gratuito</b> até 1.500/dia.<br>
+          👉 <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--verde);font-weight:700">aistudio.google.com/apikey</a>
         </div>
         <div class="form-section">
-          <label>Sua API Key do Gemini</label>
+          <label>API Key do Gemini</label>
           <div class="api-key-wrap">
             <input type="password" id="apiKeyInput" placeholder="AIza..." oninput="salvarApiKey()">
             <button class="toggle-eye" onclick="toggleApiKeyVisibility()">👁</button>
           </div>
         </div>
         <div class="form-section">
-          <label>Modelo de IA</label>
+          <label>Modelo</label>
           <select id="modelSelect" onchange="salvarApiKey()">
             <option value="gemini-2.5-flash">Gemini 2.5 Flash — Rápido e gratuito (recomendado)</option>
             <option value="gemini-2.5-pro">Gemini 2.5 Pro — Maior precisão</option>
-            <option value="gemini-1.5-flash">Gemini 1.5 Flash — Alternativa gratuita</option>
+            <option value="gemini-1.5-flash">Gemini 1.5 Flash — Alternativa</option>
           </select>
         </div>
-        <div id="apiKeyStatus" style="margin-top:10px;font-size:.82rem"></div>
+        <div id="apiKeyStatus" style="margin-top:8px;font-size:.8rem"></div>
         <div class="btn-group">
-          <button class="btn btn-primary" onclick="testarApiKey()">🔬 Testar Conexão</button>
-          <button class="btn btn-danger btn-sm" onclick="removerApiKey()">🗑 Remover chave</button>
+          <button class="btn btn-primary" onclick="testarApiKey()">🔬 Testar</button>
+          <button class="btn btn-danger btn-sm" onclick="removerApiKey()">🗑 Remover</button>
         </div>
       </div>
     </div>
 
+    <!-- Firebase -->
+    <div class="card">
+      <div class="card-header">🔥 Firebase — Login & Sincronização</div>
+      <div class="card-body">
+        <div class="info-box">
+          Permite login e sincroniza dados entre celular e computador.<br>
+          <b>100% gratuito</b> no plano Spark do Firebase.
+        </div>
+        <ol class="step-box">
+          <li>Acesse <a href="https://console.firebase.google.com" target="_blank" style="color:var(--verde)">console.firebase.google.com</a></li>
+          <li>Crie um projeto → adicione um <b>Web App</b></li>
+          <li>Copie o <code>firebaseConfig</code> e cole abaixo</li>
+          <li>Ative <b>Authentication → Google</b></li>
+          <li>Ative <b>Firestore Database</b> (modo teste)</li>
+          <li>Em Authentication → Settings → Authorized domains, adicione seu domínio GitHub Pages</li>
+        </ol>
+        <div class="form-section">
+          <label>Firebase Config (JSON)</label>
+          <textarea id="firebaseConfigInput" rows="6" placeholder='{
+  "apiKey": "AIza...",
+  "authDomain": "...",
+  "projectId": "...",
+  "storageBucket": "...",
+  "messagingSenderId": "...",
+  "appId": "..."
+}'></textarea>
+        </div>
+        <div id="firebaseStatus" style="margin-top:8px;font-size:.8rem"></div>
+        <div class="btn-group">
+          <button class="btn btn-primary" onclick="salvarFirebaseConfig()">💾 Salvar e Conectar</button>
+          <button class="btn btn-danger btn-sm" onclick="removerFirebaseConfig()">🗑 Remover</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Preferências -->
     <div class="card">
       <div class="card-header">⚙️ Preferências</div>
       <div class="card-body">
         <div class="form-section">
-          <label>🌎 Região / Bioma (para melhorar identificação)</label>
+          <label>🌎 Bioma (melhora identificação IA)</label>
           <select id="biomaSelect" onchange="salvarPrefs()">
             <option value="brasil_geral">Brasil — geral</option>
             <option value="mata_atlantica">Mata Atlântica</option>
@@ -469,46 +654,44 @@ td i { font-style: italic; color: #555; }
             <option value="pantanal">Pantanal</option>
             <option value="amazonia">Amazônia</option>
             <option value="caatinga">Caatinga</option>
-            <option value="pampa">Pampa / Rio Grande do Sul</option>
+            <option value="pampa">Pampa / RS</option>
           </select>
         </div>
         <div class="form-section">
           <label>👤 Observador padrão</label>
-          <input type="text" id="observadorPadrao" placeholder="Seu nome" oninput="salvarPrefs()">
+          <input type="text" id="observadorPadrao" oninput="salvarPrefs()">
         </div>
         <div class="form-section">
-          <label>🔄 Após salvar registro:</label>
+          <label>🔄 Após salvar registro</label>
           <select id="aposRegistro" onchange="salvarPrefs()">
-            <option value="proximo">Ir para próximo da fila automaticamente</option>
-            <option value="manter">Manter item atual selecionado</option>
+            <option value="proximo">Ir para próximo automaticamente</option>
+            <option value="manter">Manter item atual</option>
           </select>
         </div>
-        <div class="warning-box" style="margin-top:14px">
-          ⚠️ <b>Segurança:</b> Sua API key é armazenada localmente no navegador (localStorage) e nunca é enviada para nenhum servidor além da Anthropic.
-        </div>
+        <div class="warning-box">⚠️ Suas chaves ficam armazenadas localmente no navegador.</div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Modal de progresso batch -->
+<!-- Modal batch -->
 <div id="batchModal">
   <div class="modal-box">
-    <div class="modal-title">🤖 Analisando com IA...</div>
+    <div style="font-size:1.05rem;font-weight:700;margin-bottom:10px">🤖 Analisando com IA...</div>
     <div class="progress-bar-wrap"><div class="progress-bar" id="batchProgress" style="width:0%"></div></div>
-    <div class="modal-status" id="batchStatus">Iniciando...</div>
-    <div style="margin-top:8px;font-size:.78rem;color:#888" id="batchCount"></div>
-    <button class="btn btn-sm" style="margin-top:16px;background:#fee2e2;color:#dc2626;border:none" onclick="cancelarBatch()">✕ Cancelar</button>
+    <div id="batchStatus" style="font-size:.83rem;color:#555;min-height:18px"></div>
+    <div id="batchCount" style="font-size:.75rem;color:#888;margin-top:5px"></div>
+    <button class="btn btn-sm" style="margin-top:14px;background:#fee2e2;color:#dc2626;border:none" onclick="batchCancelled=true">✕ Cancelar</button>
   </div>
 </div>
 
 <div id="toast"><span id="toastMsg"></span></div>
 
 <script>
-// ════════════════════════════════════════
+// ═══════════════════════════════════════════
 // BANCO DE ESPÉCIES
-// ════════════════════════════════════════
-const ESPECIES = [
+// ═══════════════════════════════════════════
+const ESPECIES=[
   {p:"Onça-pintada",s:"Panthera onca"},{p:"Onça-parda / Puma",s:"Puma concolor"},
   {p:"Jaguarundi",s:"Herpailurus yagouaroundi"},{p:"Gato-do-mato-pequeno",s:"Leopardus guttulus"},
   {p:"Gato-maracajá",s:"Leopardus wiedii"},{p:"Lobo-guará",s:"Chrysocyon brachyurus"},
@@ -516,7 +699,7 @@ const ESPECIES = [
   {p:"Veado-campeiro",s:"Ozotoceros bezoarticus"},{p:"Veado-catingueiro",s:"Mazama gouazoubira"},
   {p:"Veado-mateiro",s:"Mazama americana"},{p:"Cervo-do-pantanal",s:"Blastocerus dichotomus"},
   {p:"Cateto / Caititu",s:"Pecari tajacu"},{p:"Queixada",s:"Tayassu pecari"},
-  {p:"Porco-monteiro (feral)",s:"Sus scrofa"},{p:"Anta",s:"Tapirus terrestris"},
+  {p:"Porco-monteiro",s:"Sus scrofa"},{p:"Anta",s:"Tapirus terrestris"},
   {p:"Capivara",s:"Hydrochoerus hydrochaeris"},{p:"Tamanduá-bandeira",s:"Myrmecophaga tridactyla"},
   {p:"Tamanduá-mirim",s:"Tamandua tetradactyla"},{p:"Tatu-galinha",s:"Dasypus novemcinctus"},
   {p:"Tatu-peba",s:"Euphractus sexcinctus"},{p:"Tatu-canastra",s:"Priodontes maximus"},
@@ -526,725 +709,855 @@ const ESPECIES = [
   {p:"Irara",s:"Eira barbara"},{p:"Lontra",s:"Lontra longicaudis"},
   {p:"Ariranha",s:"Pteronura brasiliensis"},{p:"Gambá",s:"Didelphis albiventris"},
   {p:"Ema",s:"Rhea americana"},{p:"Seriema",s:"Cariama cristata"},
-  {p:"Mutum",s:"Pauxi tuberosa"},{p:"Jacutinga",s:"Aburria jacutinga"},
-  {p:"Jacu",s:"Penelope superciliaris"},{p:"Macuco / Tinamou",s:"Tinamus solitarius"},
-  {p:"Tucano-toco",s:"Ramphastos toco"},{p:"Arara-azul",s:"Anodorhynchus hyacinthinus"},
-  {p:"Gavião-real",s:"Harpia harpyja"},{p:"Jacaré-do-pantanal",s:"Caiman crocodilus yacare"},
-  {p:"Jacaré-de-papo-amarelo",s:"Caiman latirostris"},{p:"Sucuri",s:"Eunectes murinus"},
-  {p:"Teiú",s:"Salvator merianae"},{p:"Humano",s:"Homo sapiens"},
-  {p:"Bovino / Gado",s:"Bos taurus"},{p:"Equino / Cavalo",s:"Equus caballus"},
+  {p:"Mutum",s:"Pauxi tuberosa"},{p:"Jacu",s:"Penelope superciliaris"},
+  {p:"Macuco",s:"Tinamus solitarius"},{p:"Tucano-toco",s:"Ramphastos toco"},
+  {p:"Arara-azul",s:"Anodorhynchus hyacinthinus"},{p:"Gavião-real",s:"Harpia harpyja"},
+  {p:"Jacaré-do-pantanal",s:"Caiman crocodilus yacare"},{p:"Teiú",s:"Salvator merianae"},
+  {p:"Humano",s:"Homo sapiens"},{p:"Bovino / Gado",s:"Bos taurus"},
   {p:"Indeterminado",s:"sp."},
 ];
 
-// ════════════════════════════════════════
+// ═══════════════════════════════════════════
 // ESTADO GLOBAL
-// ════════════════════════════════════════
-let registros = JSON.parse(localStorage.getItem('ct_registros') || '[]');
-let gestaoEventos = JSON.parse(localStorage.getItem('ct_gestao') || '[]');
-let fileQueue = []; // [{file, url, meta, status, iaResult, idx}]
-let selectedIdx = -1;
-let batchCancelled = false;
+// ═══════════════════════════════════════════
+let registros=[];
+let gestaoEventos=[];
+let pontos=[]; // {id, nome, lat, lng, alt, bioma, status, notas}
+let fileQueue=[];
+let selectedIdx=-1;
+let batchCancelled=false;
+let currentUser=null;
+let db=null;
+let auth=null;
+let mapa=null;
+let mapaMarkers=[];
+let editandoPontoId=null;
 
-// ════════════════════════════════════════
+// ═══════════════════════════════════════════
+// FIREBASE INIT
+// ═══════════════════════════════════════════
+function initFirebase() {
+  const raw = localStorage.getItem('ct_firebase');
+  if (!raw) {
+    document.getElementById('loginSetupNotice').style.display='block';
+    document.getElementById('btnGoogleLogin').disabled=true;
+    document.getElementById('btnGoogleLogin').style.opacity='.5';
+    return false;
+  }
+  try {
+    const cfg = JSON.parse(raw);
+    if (!firebase.apps.length) firebase.initializeApp(cfg);
+    auth = firebase.auth();
+    db = firebase.firestore();
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        currentUser = user;
+        fecharLogin();
+        carregarDadosFirestore();
+        mostrarUserChip(user);
+      } else {
+        currentUser = null;
+        document.getElementById('loginOverlay').style.display='flex';
+      }
+    });
+    return true;
+  } catch(e) {
+    console.error('Firebase init error:', e);
+    return false;
+  }
+}
+
+function loginGoogle() {
+  if (!auth) { toast('Configure o Firebase primeiro em ⚙️ Config', true); return; }
+  const provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider).catch(e => {
+    document.getElementById('loginError').textContent = 'Erro: ' + e.message;
+    document.getElementById('loginError').style.display = 'block';
+  });
+}
+
+function loginLocal() {
+  currentUser = null;
+  carregarLocal();
+  fecharLogin();
+  mostrarUserChip(null);
+}
+
+function fecharLogin() {
+  document.getElementById('loginOverlay').style.display='none';
+}
+
+function mostrarUserChip(user) {
+  const chip = document.getElementById('userChip');
+  chip.style.display = 'flex';
+  if (user) {
+    document.getElementById('userName').textContent = user.displayName || user.email;
+    if (user.photoURL) document.getElementById('userAvatar').innerHTML=`<img src="${user.photoURL}">`;
+    document.getElementById('syncDot').classList.remove('offline');
+  } else {
+    document.getElementById('userName').textContent = 'Local';
+    document.getElementById('syncDot').classList.add('offline');
+  }
+}
+
+function menuUsuario() {
+  if (!currentUser) { toast('Modo local — dados neste navegador apenas'); return; }
+  if (confirm(`Logado como: ${currentUser.email}\n\nDeseja sair?`)) {
+    auth.signOut();
+    document.getElementById('loginOverlay').style.display='flex';
+    registros=[]; gestaoEventos=[]; pontos=[];
+    renderTabela(); renderGestaoTabela(); renderPontos();
+    atualizarBadges();
+  }
+}
+
+// ═══════════════════════════════════════════
+// FIRESTORE CRUD
+// ═══════════════════════════════════════════
+async function carregarDadosFirestore() {
+  if (!db||!currentUser) return;
+  try {
+    const uid=currentUser.uid;
+    const [rSnap,gSnap,pSnap] = await Promise.all([
+      db.collection(`users/${uid}/registros`).orderBy('data','asc').get(),
+      db.collection(`users/${uid}/gestao`).orderBy('data','asc').get(),
+      db.collection(`users/${uid}/pontos`).get(),
+    ]);
+    registros = rSnap.docs.map(d=>({id:d.id,...d.data()}));
+    gestaoEventos = gSnap.docs.map(d=>({id:d.id,...d.data()}));
+    pontos = pSnap.docs.map(d=>({id:d.id,...d.data()}));
+    renderTabela(); renderGestaoTabela(); renderPontos(); atualizarBadges();
+    atualizarDataLists(); atualizarSelectCameras();
+    renderMapa();
+    toast('☁️ Dados carregados da nuvem');
+  } catch(e) { toast('Erro ao carregar: '+e.message, true); }
+}
+
+async function salvarFirestore(colecao, dado) {
+  if (!db||!currentUser) return;
+  mostrarSync(true);
+  try {
+    const uid=currentUser.uid;
+    const ref = db.collection(`users/${uid}/${colecao}`);
+    if (dado.id && typeof dado.id === 'string' && dado.id.length > 10) {
+      const {id,...data} = dado;
+      await ref.doc(id).set(data);
+    } else {
+      const {id,...data} = dado;
+      const doc = await ref.add(data);
+      dado.id = doc.id;
+    }
+  } catch(e) { toast('Erro ao salvar na nuvem: '+e.message, true); }
+  mostrarSync(false);
+}
+
+async function deletarFirestore(colecao, id) {
+  if (!db||!currentUser) return;
+  try {
+    await db.collection(`users/${currentUser.uid}/${colecao}`).doc(id).delete();
+  } catch(e) { toast('Erro ao deletar: '+e.message, true); }
+}
+
+function mostrarSync(show) {
+  document.getElementById('syncSaving').classList.toggle('show', show);
+}
+
+// ═══════════════════════════════════════════
+// LOCAL STORAGE (fallback)
+// ═══════════════════════════════════════════
+function carregarLocal() {
+  registros = JSON.parse(localStorage.getItem('ct_registros')||'[]');
+  gestaoEventos = JSON.parse(localStorage.getItem('ct_gestao')||'[]');
+  pontos = JSON.parse(localStorage.getItem('ct_pontos')||'[]');
+  renderTabela(); renderGestaoTabela(); renderPontos(); atualizarBadges();
+  atualizarDataLists(); atualizarSelectCameras();
+  renderMapa();
+}
+
+function salvarLocal() {
+  if (currentUser) return; // Firestore handles it
+  localStorage.setItem('ct_registros',JSON.stringify(registros));
+  localStorage.setItem('ct_gestao',JSON.stringify(gestaoEventos));
+  localStorage.setItem('ct_pontos',JSON.stringify(pontos));
+}
+
+// ═══════════════════════════════════════════
 // INIT
-// ════════════════════════════════════════
+// ═══════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
   carregarPrefs();
   atualizarApiStatus();
-  renderTabela();
-  renderGestaoTabela();
-  atualizarBadges();
-  atualizarDataLists();
+  const firebaseOk = initFirebase();
+  if (!firebaseOk) {
+    carregarLocal();
+    mostrarUserChip(null);
+  }
 
   // Drag & drop
-  const dz = document.getElementById('dropZone');
-  ['dragover','dragenter'].forEach(e => dz.addEventListener(e, ev => { ev.preventDefault(); dz.classList.add('drag'); }));
-  ['dragleave','dragend'].forEach(e => dz.addEventListener(e, () => dz.classList.remove('drag')));
-  dz.addEventListener('drop', ev => { ev.preventDefault(); dz.classList.remove('drag'); adicionarArquivos(ev.dataTransfer.files); });
-  document.getElementById('f_data').value = new Date().toISOString().split('T')[0];
-  document.getElementById('g_data').value = new Date().toISOString().split('T')[0];
+  const dz=document.getElementById('dropZone');
+  ['dragover','dragenter'].forEach(e=>dz.addEventListener(e,ev=>{ev.preventDefault();dz.classList.add('drag');}));
+  ['dragleave','dragend'].forEach(e=>dz.addEventListener(e,()=>dz.classList.remove('drag')));
+  dz.addEventListener('drop',ev=>{ev.preventDefault();dz.classList.remove('drag');adicionarArquivos(ev.dataTransfer.files);});
+
+  document.getElementById('f_data').value=new Date().toISOString().split('T')[0];
+  document.getElementById('g_data').value=new Date().toISOString().split('T')[0];
+
+  // Inicializar mapa
+  setTimeout(inicializarMapa, 300);
 });
 
-// ════════════════════════════════════════
+// ═══════════════════════════════════════════
 // TABS
-// ════════════════════════════════════════
+// ═══════════════════════════════════════════
 function showTab(name) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
-  const tabs = ['analise','gestao','tabela','config'];
-  const tabEls = document.querySelectorAll('.tab');
-  tabEls[tabs.indexOf(name)]?.classList.add('active');
+  const tabs=['analise','mapa','gestao','tabela','config'];
+  document.querySelectorAll('.tab')[tabs.indexOf(name)]?.classList.add('active');
+  if(name==='mapa') setTimeout(()=>{if(mapa)mapa.invalidateSize();},100);
 }
 
-// ════════════════════════════════════════
-// FILA DE ARQUIVOS
-// ════════════════════════════════════════
-function adicionarArquivos(files) {
-  const arr = Array.from(files).filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'));
-  if (!arr.length) { toast('Nenhum arquivo de imagem ou vídeo encontrado.', true); return; }
+// ═══════════════════════════════════════════
+// MAPA (Leaflet)
+// ═══════════════════════════════════════════
+function inicializarMapa() {
+  const el = document.getElementById('mapaContainer');
+  if (!el||mapa) return;
+  mapa = L.map('mapaContainer').setView([-15.7801,-47.9292], 4);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© <a href="https://openstreetmap.org">OpenStreetMap</a>',maxZoom:18
+  }).addTo(mapa);
+  renderMapa();
+}
 
-  arr.forEach(file => {
-    const meta = extrairMetadados(file.name);
-    const url = URL.createObjectURL(file);
-    fileQueue.push({ file, url, meta, status: 'waiting', iaResult: null, idx: fileQueue.length });
+function renderMapa() {
+  if (!mapa) return;
+  mapaMarkers.forEach(m=>m.remove());
+  mapaMarkers=[];
+  if (!pontos.length) {
+    document.getElementById('mapaInfo').textContent='Nenhum ponto cadastrado';
+    return;
+  }
+  const ativos = pontos.filter(p=>p.lat&&p.lng);
+  document.getElementById('mapaInfo').textContent=`${ativos.length} ponto(s) com GPS`;
+  const bounds=[];
+  ativos.forEach(p=>{
+    const cor = p.status==='ativo'?'#2d6a4f':p.status==='manutencao'?'#f4a261':'#e76f51';
+    const icon = L.divIcon({className:'',html:`<div style="width:14px;height:14px;border-radius:50%;background:${cor};border:2.5px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,iconSize:[14,14],iconAnchor:[7,7]});
+    const regCount = registros.filter(r=>r.camera===p.nome).length;
+    const marker = L.marker([p.lat,p.lng],{icon}).addTo(mapa)
+      .bindPopup(`<b>${p.nome}</b><br>${p.bioma||'—'}<br>📍 ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}<br>${p.alt?`⛰ ${p.alt}m<br>`:''}🦜 ${regCount} registros<br><span style="font-size:.75rem;color:${cor}">${p.status||'ativo'}</span>`);
+    mapaMarkers.push(marker);
+    bounds.push([p.lat,p.lng]);
   });
+  if (bounds.length>0) mapa.fitBounds(bounds,{padding:[30,30],maxZoom:14});
+}
 
-  document.getElementById('emptyQueue').style.display = 'none';
-  renderQueue();
-  atualizarBadges();
+// ═══════════════════════════════════════════
+// GPS CAPTURE
+// ═══════════════════════════════════════════
+function capturarGPS(latId, lngId, altId, statusId) {
+  const statusEl = document.getElementById(statusId);
+  statusEl.style.display='block';
+  statusEl.textContent='📡 Obtendo localização GPS...';
+  if (!navigator.geolocation) { statusEl.textContent='⚠️ GPS não suportado neste dispositivo'; return; }
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      document.getElementById(latId).value = pos.coords.latitude.toFixed(6);
+      document.getElementById(lngId).value = pos.coords.longitude.toFixed(6);
+      if(altId && pos.coords.altitude) document.getElementById(altId).value = Math.round(pos.coords.altitude);
+      const acc = Math.round(pos.coords.accuracy);
+      statusEl.textContent = `✅ GPS capturado! Precisão: ~${acc}m`;
+      statusEl.style.color = acc<50?'var(--verde)':'var(--amarelo)';
+      toast(`📡 GPS capturado! Precisão: ~${acc}m`);
+    },
+    err => {
+      const msgs={1:'Permissão negada — ative o GPS nas configurações',2:'Sinal GPS não encontrado',3:'Tempo esgotado — tente ao ar livre'};
+      statusEl.textContent = '⚠️ '+( msgs[err.code]||err.message);
+      statusEl.style.color='#dc2626';
+    },
+    {enableHighAccuracy:true, timeout:15000, maximumAge:0}
+  );
+}
 
-  // Seleciona o primeiro não processado
-  const first = fileQueue.find(q => q.status === 'waiting');
-  if (first) selecionarItem(first.idx);
+function colarDoMaps() {
+  const txt = prompt('Cole as coordenadas do Google Maps\n(ex: -23.5489, -46.6388)');
+  if (!txt) return;
+  const m = txt.match(/([-\d.]+)[,\s]+([-\d.]+)/);
+  if (m) { document.getElementById('p_lat').value=parseFloat(m[1]).toFixed(6); document.getElementById('p_lng').value=parseFloat(m[2]).toFixed(6); toast('📍 Coordenadas coladas!'); }
+  else toast('Formato não reconhecido. Use: -23.5489, -46.6388', true);
+}
 
-  toast(`✅ ${arr.length} arquivo(s) adicionado(s) à fila`);
+// ═══════════════════════════════════════════
+// PONTOS DE CÂMERA
+// ═══════════════════════════════════════════
+async function salvarPonto() {
+  const nome = document.getElementById('p_nome').value.trim();
+  if (!nome) { toast('Informe o nome/ID da câmera', true); return; }
+  const ponto = {
+    id: editandoPontoId || Date.now().toString(),
+    nome,
+    lat: parseFloat(document.getElementById('p_lat').value)||null,
+    lng: parseFloat(document.getElementById('p_lng').value)||null,
+    alt: parseFloat(document.getElementById('p_alt').value)||null,
+    bioma: document.getElementById('p_bioma').value,
+    status: document.getElementById('p_status').value,
+    notas: document.getElementById('p_notas').value.trim(),
+  };
+  const idx = pontos.findIndex(p=>p.id===ponto.id);
+  if (idx>=0) pontos[idx]=ponto; else pontos.push(ponto);
+
+  if (currentUser) await salvarFirestore('pontos', ponto);
+  else salvarLocal();
+
+  renderPontos(); atualizarBadges(); atualizarDataLists(); atualizarSelectCameras(); renderMapa(); renderTabela();
+  limparFormPonto();
+  toast('📍 Ponto '+(editandoPontoId?'atualizado':'cadastrado')+'! '+nome);
+  editandoPontoId=null;
+}
+
+function renderPontos() {
+  const el = document.getElementById('pontosList');
+  if (!pontos.length) { el.innerHTML='<div style="color:#aaa;font-size:.82rem;font-style:italic">Nenhum ponto cadastrado.</div>'; return; }
+  el.innerHTML = pontos.map(p => `
+    <div class="ponto-item ${p.status==='inativo'?'inativo':''}" onclick="editarPonto('${p.id}')">
+      <div class="ponto-nome">${p.nome} <span style="font-size:.7rem;color:${p.status==='ativo'?'var(--verde)':'#e76f51'}">[${p.status||'ativo'}]</span></div>
+      ${p.lat&&p.lng?`<div class="ponto-coords">📍 ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)} ${p.alt?`· ⛰${p.alt}m`:''}</div>`:'<div style="font-size:.73rem;color:#e76f51">⚠️ Sem coordenadas GPS</div>'}
+      ${p.bioma?`<div style="font-size:.73rem;color:#666">${p.bioma}</div>`:''}
+    </div>`).join('');
+
+  // Tabela pontos
+  const tbody = document.getElementById('pontosBody');
+  if (tbody) tbody.innerHTML = pontos.map((p,i)=>`<tr>
+    <td>${i+1}</td><td><b>${p.nome}</b></td>
+    <td>${p.lat!=null?p.lat.toFixed(6):'—'}</td>
+    <td>${p.lng!=null?p.lng.toFixed(6):'—'}</td>
+    <td>${p.alt!=null?p.alt+'m':'—'}</td>
+    <td>${p.bioma||'—'}</td>
+    <td><span style="background:${p.status==='ativo'?'#d1fae5':'#fee2e2'};color:${p.status==='ativo'?'#065f46':'#dc2626'};padding:2px 7px;border-radius:10px;font-size:.72rem;font-weight:700">${p.status||'ativo'}</span></td>
+    <td>${p.notas||'—'}</td>
+    <td><button class="del-btn" onclick="deletarPonto('${p.id}')">✕</button></td>
+  </tr>`).join('');
+}
+
+function editarPonto(id) {
+  const p = pontos.find(pt=>pt.id===id);
+  if (!p) return;
+  editandoPontoId = id;
+  document.getElementById('p_nome').value=p.nome||'';
+  document.getElementById('p_lat').value=p.lat||'';
+  document.getElementById('p_lng').value=p.lng||'';
+  document.getElementById('p_alt').value=p.alt||'';
+  document.getElementById('p_bioma').value=p.bioma||'';
+  document.getElementById('p_status').value=p.status||'ativo';
+  document.getElementById('p_notas').value=p.notas||'';
+  showTab('mapa');
+  toast('✏️ Editando: '+p.nome);
+}
+
+async function deletarPonto(id) {
+  if (!confirm('Remover este ponto?')) return;
+  pontos = pontos.filter(p=>p.id!==id);
+  if (currentUser) await deletarFirestore('pontos', id);
+  else salvarLocal();
+  renderPontos(); renderMapa(); atualizarBadges(); atualizarSelectCameras();
+}
+
+function limparFormPonto() {
+  ['p_nome','p_lat','p_lng','p_alt','p_notas'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('p_bioma').value='';
+  document.getElementById('p_status').value='ativo';
+  document.getElementById('gpsPontoStatus').style.display='none';
+  editandoPontoId=null;
+}
+
+function preencherCoordsDaCamera() {
+  const nomeCam = document.getElementById('f_camera').value;
+  const ponto = pontos.find(p=>p.nome===nomeCam);
+  const display = document.getElementById('coordsDisplay');
+  if (ponto&&ponto.lat&&ponto.lng) {
+    document.getElementById('coordsLat').textContent=`Lat: ${ponto.lat.toFixed(5)}`;
+    document.getElementById('coordsLng').textContent=`Lng: ${ponto.lng.toFixed(5)}`;
+    document.getElementById('coordsAlt').textContent=ponto.alt?`Alt: ${ponto.alt}m`:'';
+    display.classList.add('show');
+  } else {
+    display.classList.remove('show');
+  }
+}
+
+function atualizarSelectCameras() {
+  const opts = pontos.map(p=>`<option value="${p.nome}">${p.nome}${p.status!=='ativo'?' ['+p.status+']':''}</option>`).join('');
+  const emptyOpt = '<option value="">— selecione —</option>';
+  ['f_camera','g_camera'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.innerHTML = emptyOpt + opts;
+  });
+}
+
+// ═══════════════════════════════════════════
+// FILA DE ARQUIVOS
+// ═══════════════════════════════════════════
+function adicionarArquivos(files) {
+  const arr=Array.from(files).filter(f=>f.type.startsWith('image/')||f.type.startsWith('video/'));
+  if(!arr.length){toast('Nenhum arquivo de imagem ou vídeo.',true);return;}
+  arr.forEach(file=>{
+    const meta=extrairMetadados(file.name);
+    fileQueue.push({file,url:URL.createObjectURL(file),meta,status:'waiting',iaResult:null,idx:fileQueue.length});
+  });
+  document.getElementById('emptyQueue').style.display='none';
+  renderQueue(); atualizarBadges();
+  const first=fileQueue.find(q=>q.status==='waiting');
+  if(first) selecionarItem(first.idx);
+  toast(`✅ ${arr.length} arquivo(s) adicionado(s)`);
 }
 
 function renderQueue() {
-  const grid = document.getElementById('queueGrid');
-  grid.innerHTML = fileQueue.map((item, i) => `
-    <div class="queue-card ${item.status === 'saved' ? 'done' : ''} ${item.status === 'error' ? 'error-card' : ''} ${selectedIdx === i ? 'active-card' : ''}"
-         id="qcard-${i}" onclick="selecionarItem(${i})">
+  const grid=document.getElementById('queueGrid');
+  grid.innerHTML=fileQueue.map((item,i)=>`
+    <div class="queue-card ${item.status==='saved'?'done':''} ${selectedIdx===i?'active-card':''}" id="qcard-${i}" onclick="selecionarItem(${i})">
       <div class="queue-card-top">
         ${item.file.type.startsWith('image/')
-          ? `<img class="queue-thumb" src="${item.url}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 80 56%22><rect fill=%22%23ddd%22 width=%2280%22 height=%2256%22/><text y=%2234%22 x=%2240%22 text-anchor=%22middle%22 font-size=%2218%22>📷</text></svg>'">`
-          : `<div class="queue-thumb-video"><video src="${item.url}" preload="metadata" style="width:80px;height:56px;border-radius:6px;background:#111"></video></div>`
-        }
+          ?`<img class="queue-thumb" src="${item.url}">`
+          :`<video src="${item.url}" preload="metadata" style="width:74px;height:52px;border-radius:6px;background:#111;flex-shrink:0"></video>`}
         <div class="queue-info">
           <div class="queue-filename">${item.file.name}</div>
-          <div class="queue-meta">
-            ${item.meta.dataFmt ? `📅 ${item.meta.dataFmt}` : ''}
-            ${item.meta.hora ? ` · ⏰ ${item.meta.hora}` : ''}
-            ${item.meta.camera ? ` · 📷 ${item.meta.camera}` : ''}
-          </div>
-          <div style="margin-top:4px">${statusPill(item.status, item.iaResult)}</div>
+          <div class="queue-meta">${item.meta.dataFmt?`📅 ${item.meta.dataFmt}`:''}${item.meta.hora?` · ⏰ ${item.meta.hora}`:''}</div>
+          <div style="margin-top:3px">${statusPill(item.status)}</div>
         </div>
       </div>
-      ${item.iaResult && item.status !== 'error' ? `
+      ${item.iaResult&&item.status!=='error'?`
         <div class="ia-result">
-          <div class="species-name">${item.iaResult.species_popular || '?'}</div>
-          <div class="species-sci">${item.iaResult.species_scientific || ''}</div>
+          <div class="species-name">${item.iaResult.species_popular||'?'}</div>
+          <div style="font-style:italic;color:#666;font-size:.77rem">${item.iaResult.species_scientific||''}</div>
           <div class="ia-tags">
-            ${item.iaResult.count ? `<span class="ia-tag">🔢 ${item.iaResult.count} ind.</span>` : ''}
-            ${item.iaResult.behavior ? `<span class="ia-tag">🏃 ${item.iaResult.behavior.substring(0,30)}</span>` : ''}
-            ${item.iaResult.confidence ? `<span class="ia-tag conf-${item.iaResult.confidence}">Conf. ${item.iaResult.confidence}</span>` : ''}
+            ${item.iaResult.count?`<span class="ia-tag">🔢 ${item.iaResult.count}</span>`:''}
+            ${item.iaResult.confidence?`<span class="ia-tag conf-${item.iaResult.confidence}">${item.iaResult.confidence}</span>`:''}
           </div>
-          ${item.iaResult.notes ? `<div class="ia-notes">${item.iaResult.notes.substring(0,80)}${item.iaResult.notes.length>80?'...':''}</div>` : ''}
-        </div>
-      ` : ''}
-    </div>
-  `).join('');
+        </div>`:''}`).join('');
 }
 
-function statusPill(status, iaResult) {
-  const map = {
-    waiting: `<span class="status-pill pill-waiting">⏳ Aguardando</span>`,
-    analyzing: `<span class="status-pill pill-analyzing"><span class="spinner"></span> Analisando...</span>`,
-    done: `<span class="status-pill pill-done">✅ Identificado</span>`,
-    saved: `<span class="status-pill pill-saved">💾 Salvo</span>`,
-    error: `<span class="status-pill pill-error">⚠️ Erro</span>`,
-  };
-  return map[status] || '';
+function statusPill(s) {
+  const m={waiting:`<span class="status-pill pill-waiting">⏳ Aguardando</span>`,analyzing:`<span class="status-pill pill-analyzing"><span class="spinner"></span> Analisando</span>`,done:`<span class="status-pill pill-done">✅ Identificado</span>`,saved:`<span class="status-pill pill-saved">💾 Salvo</span>`,error:`<span class="status-pill pill-error">⚠️ Erro</span>`};
+  return m[s]||'';
 }
 
 function selecionarItem(idx) {
-  selectedIdx = idx;
-  const item = fileQueue[idx];
-  if (!item) return;
-
-  // Atualizar highlight na fila
-  document.querySelectorAll('.queue-card').forEach((el, i) => {
-    el.classList.toggle('active-card', i === idx);
-  });
-
-  // Preencher formulário
-  document.getElementById('f_currentIdx').value = idx;
-  document.getElementById('f_arquivo').value = item.file.name;
-  document.getElementById('formFilename').textContent = item.file.name.substring(0,28) + (item.file.name.length>28?'...':'');
-
-  const m = item.meta;
-  if (m.data) document.getElementById('f_data').value = m.data;
-  if (m.hora) document.getElementById('f_hora').value = m.hora;
-  if (m.camera) document.getElementById('f_camera').value = m.camera;
-
-  // Preview
-  const previewDiv = document.getElementById('formPreview');
-  const previewImg = document.getElementById('previewImg');
-  const previewVideo = document.getElementById('previewVideo');
-  previewDiv.style.display = 'block';
-  if (item.file.type.startsWith('image/')) {
-    previewImg.src = item.url; previewImg.style.display = 'block';
-    previewVideo.style.display = 'none';
-  } else {
-    previewVideo.src = item.url; previewVideo.style.display = 'block';
-    previewImg.style.display = 'none';
+  selectedIdx=idx;
+  const item=fileQueue[idx];
+  if(!item) return;
+  document.querySelectorAll('.queue-card').forEach((el,i)=>el.classList.toggle('active-card',i===idx));
+  document.getElementById('f_currentIdx').value=idx;
+  document.getElementById('f_arquivo').value=item.file.name;
+  document.getElementById('formFilename').textContent=item.file.name.substring(0,26)+(item.file.name.length>26?'...':'');
+  const m=item.meta;
+  if(m.data) document.getElementById('f_data').value=m.data;
+  if(m.hora) document.getElementById('f_hora').value=m.hora;
+  if(m.camera) {
+    const sel=document.getElementById('f_camera');
+    // Try to match camera from filename to pontos
+    const match=[...sel.options].find(o=>o.value.toUpperCase()===m.camera.toUpperCase());
+    if(match) { sel.value=match.value; preencherCoordsDaCamera(); }
   }
-
-  // Observador padrão
-  const prefs = JSON.parse(localStorage.getItem('ct_prefs') || '{}');
-  if (prefs.observador) document.getElementById('f_observador').value = prefs.observador;
-
-  // Preencher com resultado de IA se tiver
-  if (item.iaResult && item.status !== 'error') {
-    preencherFormComIA(item.iaResult);
-  }
-
-  document.getElementById('btnAnalisarItem').disabled = false;
-  document.getElementById('btnAnalisarItem').textContent = '🤖 Analisar com IA';
+  const prefs=JSON.parse(localStorage.getItem('ct_prefs')||'{}');
+  if(prefs.observador) document.getElementById('f_observador').value=prefs.observador;
+  const prev=document.getElementById('formPreview');
+  prev.style.display='block';
+  const img=document.getElementById('previewImg'),vid=document.getElementById('previewVideo');
+  if(item.file.type.startsWith('image/')){img.src=item.url;img.style.display='block';vid.style.display='none';}
+  else{vid.src=item.url;vid.style.display='block';img.style.display='none';}
+  if(item.iaResult&&item.status!=='error') preencherFormComIA(item.iaResult);
+  document.getElementById('btnAnalisarItem').disabled=false;
 }
 
-function preencherFormComIA(result) {
-  if (result.species_popular) document.getElementById('f_nome_popular').value = result.species_popular;
-  if (result.species_scientific) document.getElementById('f_nome_cientifico').value = result.species_scientific;
-  if (result.count) document.getElementById('f_individuos').value = result.count;
-  if (result.sex) {
-    const s = document.getElementById('f_sexo');
-    const opt = Array.from(s.options).find(o => o.value.toLowerCase().includes(result.sex.toLowerCase()));
-    if (opt) s.value = opt.value;
-  }
-  if (result.age) {
-    const a = document.getElementById('f_idade');
-    const opt = Array.from(a.options).find(o => o.value.toLowerCase().includes(result.age.toLowerCase()));
-    if (opt) a.value = opt.value;
-  }
-  if (result.behavior) {
-    const b = document.getElementById('f_comportamento');
-    const opt = Array.from(b.options).find(o => o.value.toLowerCase().includes(result.behavior.toLowerCase().split(' ')[0]));
-    if (opt) b.value = opt.value; else { b.value = 'Outro'; }
-  }
-  if (result.notes) document.getElementById('f_obs').value = result.notes;
-  document.getElementById('f_confianca').value = result.confidence || '';
-
-  // Banner IA
-  const banner = document.getElementById('iaBanner');
-  banner.style.display = 'block';
-  document.getElementById('iaBannerContent').innerHTML =
-    `<b>${result.species_popular}</b> <i>(${result.species_scientific})</i> · ${result.count} ind. · Confiança: <b>${result.confidence}</b>`;
+function preencherFormComIA(r) {
+  if(r.species_popular) document.getElementById('f_nome_popular').value=r.species_popular;
+  if(r.species_scientific) document.getElementById('f_nome_cientifico').value=r.species_scientific;
+  if(r.count) document.getElementById('f_individuos').value=r.count;
+  if(r.sex){const s=document.getElementById('f_sexo');const o=[...s.options].find(x=>x.value.toLowerCase().includes(r.sex.toLowerCase()));if(o)s.value=o.value;}
+  if(r.age){const a=document.getElementById('f_idade');const o=[...a.options].find(x=>x.value.toLowerCase().includes(r.age.toLowerCase()));if(o)a.value=o.value;}
+  if(r.behavior){const b=document.getElementById('f_comportamento');const o=[...b.options].find(x=>x.value.toLowerCase().includes(r.behavior.toLowerCase().split(' ')[0]));if(o)b.value=o.value;}
+  if(r.notes) document.getElementById('f_obs').value=r.notes;
+  document.getElementById('f_confianca').value=r.confidence||'';
+  const banner=document.getElementById('iaBanner');
+  banner.style.display='block';
+  document.getElementById('iaBannerContent').innerHTML=`<b>${r.species_popular}</b> <i>(${r.species_scientific})</i> · ${r.count} ind. · Confiança: <b>${r.confidence}</b>`;
 }
 
 function limparFormSem() {
-  ['f_nome_popular','f_nome_cientifico','f_obs'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('f_individuos').value = 1;
-  document.getElementById('f_sexo').value = '';
-  document.getElementById('f_idade').value = '';
-  document.getElementById('f_comportamento').value = '';
-  document.getElementById('f_confianca').value = '';
-  document.getElementById('iaBanner').style.display = 'none';
+  ['f_nome_popular','f_nome_cientifico','f_obs'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f_individuos').value=1;
+  ['f_sexo','f_idade','f_comportamento'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f_confianca').value='';
+  document.getElementById('iaBanner').style.display='none';
 }
 
 function proximoItem() {
-  const next = fileQueue.findIndex((q, i) => i > selectedIdx && q.status !== 'saved');
-  if (next >= 0) selecionarItem(next);
-  else toast('Todos os itens da fila foram processados!');
+  const next=fileQueue.findIndex((q,i)=>i>selectedIdx&&q.status!=='saved');
+  if(next>=0) selecionarItem(next); else toast('Todos os itens processados!');
 }
 
 function limparFila() {
-  if (!confirm('Limpar toda a fila? Registros já salvos não são afetados.')) return;
-  fileQueue.forEach(f => URL.revokeObjectURL(f.url));
-  fileQueue = [];
-  selectedIdx = -1;
-  document.getElementById('queueGrid').innerHTML = '';
-  document.getElementById('emptyQueue').style.display = 'block';
-  document.getElementById('formPreview').style.display = 'none';
-  document.getElementById('iaBanner').style.display = 'none';
+  if(!confirm('Limpar fila? Registros já salvos não são afetados.')) return;
+  fileQueue.forEach(f=>URL.revokeObjectURL(f.url));
+  fileQueue=[]; selectedIdx=-1;
+  document.getElementById('queueGrid').innerHTML='';
+  document.getElementById('emptyQueue').style.display='block';
+  document.getElementById('formPreview').style.display='none';
   atualizarBadges();
 }
 
-// ════════════════════════════════════════
+// ═══════════════════════════════════════════
 // ANÁLISE COM IA
-// ════════════════════════════════════════
+// ═══════════════════════════════════════════
 async function analisarItemAtual() {
-  const idx = parseInt(document.getElementById('f_currentIdx').value);
-  if (isNaN(idx) || !fileQueue[idx]) { toast('Selecione um item da fila primeiro.', true); return; }
-  const apiKey = localStorage.getItem('ct_apikey');
-  if (!apiKey) { toast('Configure sua API key em ⚙️ Config', true); showTab('config'); return; }
-
-  const btn = document.getElementById('btnAnalisarItem');
-  btn.disabled = true;
-  btn.textContent = '⏳ Analisando...';
-  fileQueue[idx].status = 'analyzing';
-  renderQueue();
-
-  try {
-    const imageB64 = await fileParaBase64(fileQueue[idx]);
-    const result = await chamarClaudeIA(imageB64, apiKey);
-    fileQueue[idx].iaResult = result;
-    fileQueue[idx].status = 'done';
-    preencherFormComIA(result);
-    renderQueue();
-    toast(`✅ ${result.species_popular} (confiança ${result.confidence})`);
-  } catch (e) {
-    fileQueue[idx].status = 'error';
-    fileQueue[idx].iaResult = { error: e.message };
-    renderQueue();
-    toast('⚠️ Erro: ' + e.message, true);
-  }
-
-  btn.disabled = false;
-  btn.textContent = '🤖 Analisar novamente';
+  const idx=parseInt(document.getElementById('f_currentIdx').value);
+  if(isNaN(idx)||!fileQueue[idx]){toast('Selecione um item primeiro.',true);return;}
+  const apiKey=localStorage.getItem('ct_apikey');
+  if(!apiKey){toast('Configure a API key em ⚙️ Config',true);showTab('config');return;}
+  const btn=document.getElementById('btnAnalisarItem');
+  btn.disabled=true; btn.textContent='⏳ Analisando...';
+  fileQueue[idx].status='analyzing'; renderQueue();
+  try{
+    const imgData=await fileParaBase64(fileQueue[idx]);
+    const result=await chamarGemini(imgData,apiKey);
+    fileQueue[idx].iaResult=result; fileQueue[idx].status='done';
+    preencherFormComIA(result); renderQueue();
+    toast(`✅ ${result.species_popular} (${result.confidence})`);
+  }catch(e){fileQueue[idx].status='error'; fileQueue[idx].iaResult={error:e.message}; renderQueue(); toast('⚠️ '+e.message,true);}
+  btn.disabled=false; btn.textContent='🤖 Analisar novamente';
 }
 
 async function analisarTodos() {
-  const apiKey = localStorage.getItem('ct_apikey');
-  if (!apiKey) { toast('Configure sua API key em ⚙️ Config', true); showTab('config'); return; }
-
-  const pendentes = fileQueue.filter(q => q.status === 'waiting' || q.status === 'error');
-  if (!pendentes.length) { toast('Todos os itens já foram analisados.'); return; }
-
-  batchCancelled = false;
-  const modal = document.getElementById('batchModal');
-  modal.classList.add('show');
-
-  for (let i = 0; i < pendentes.length; i++) {
-    if (batchCancelled) break;
-    const item = pendentes[i];
-    const pct = Math.round((i / pendentes.length) * 100);
-    document.getElementById('batchProgress').style.width = pct + '%';
-    document.getElementById('batchStatus').textContent = `Analisando: ${item.file.name}`;
-    document.getElementById('batchCount').textContent = `${i+1} de ${pendentes.length}`;
-
-    item.status = 'analyzing';
+  const apiKey=localStorage.getItem('ct_apikey');
+  if(!apiKey){toast('Configure a API key em ⚙️ Config',true);showTab('config');return;}
+  const pend=fileQueue.filter(q=>q.status==='waiting'||q.status==='error');
+  if(!pend.length){toast('Todos os itens já foram analisados.');return;}
+  batchCancelled=false;
+  document.getElementById('batchModal').classList.add('show');
+  for(let i=0;i<pend.length;i++){
+    if(batchCancelled) break;
+    const item=pend[i];
+    document.getElementById('batchProgress').style.width=Math.round((i/pend.length)*100)+'%';
+    document.getElementById('batchStatus').textContent='Analisando: '+item.file.name;
+    document.getElementById('batchCount').textContent=`${i+1} de ${pend.length}`;
+    item.status='analyzing'; renderQueue();
+    try{const d=await fileParaBase64(item);const r=await chamarGemini(d,apiKey);item.iaResult=r;item.status='done';}
+    catch(e){item.status='error';item.iaResult={error:e.message};}
     renderQueue();
-
-    try {
-      const imageB64 = await fileParaBase64(item);
-      const result = await chamarClaudeIA(imageB64, apiKey);
-      item.iaResult = result;
-      item.status = 'done';
-    } catch (e) {
-      item.status = 'error';
-      item.iaResult = { error: e.message };
-    }
-    renderQueue();
-
-    // Pequena pausa para não sobrecarregar a API
-    await new Promise(r => setTimeout(r, 300));
+    await new Promise(r=>setTimeout(r,300));
   }
-
-  document.getElementById('batchProgress').style.width = '100%';
-  document.getElementById('batchStatus').textContent = batchCancelled ? 'Cancelado.' : 'Concluído!';
-  await new Promise(r => setTimeout(r, 1000));
-  modal.classList.remove('show');
-
-  if (!batchCancelled) {
-    toast(`🎉 ${pendentes.length} arquivos analisados!`);
-    const firstDone = fileQueue.findIndex(q => q.status === 'done');
-    if (firstDone >= 0) selecionarItem(firstDone);
+  document.getElementById('batchProgress').style.width='100%';
+  document.getElementById('batchStatus').textContent=batchCancelled?'Cancelado.':'Concluído!';
+  await new Promise(r=>setTimeout(r,900));
+  document.getElementById('batchModal').classList.remove('show');
+  if(!batchCancelled){
+    toast(`🎉 ${pend.length} arquivos analisados!`);
+    const first=fileQueue.findIndex(q=>q.status==='done');
+    if(first>=0) selecionarItem(first);
   }
 }
 
-function cancelarBatch() { batchCancelled = true; }
-
 async function fileParaBase64(item) {
-  if (item.file.type.startsWith('image/')) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = async e => {
-        try {
-          const b64 = await redimensionarImagem(e.target.result);
-          resolve({ data: b64, type: 'image/jpeg' });
-        } catch(err) { reject(err); }
-      };
-      reader.onerror = () => reject(new Error('Erro ao ler arquivo'));
+  if(item.file.type.startsWith('image/')){
+    return new Promise((res,rej)=>{
+      const reader=new FileReader();
+      reader.onload=async e=>{try{res({data:await redimensionar(e.target.result),type:'image/jpeg'});}catch(err){rej(err);}};
+      reader.onerror=()=>rej(new Error('Erro ao ler arquivo'));
       reader.readAsDataURL(item.file);
     });
   } else {
-    // Vídeo: captura frame
-    return new Promise((resolve, reject) => {
-      const video = document.createElement('video');
-      video.src = item.url;
-      video.crossOrigin = 'anonymous';
-      video.preload = 'metadata';
-      video.muted = true;
-      video.onloadeddata = () => {
-        video.currentTime = Math.min(3, video.duration * 0.1);
+    return new Promise((res,rej)=>{
+      const video=document.createElement('video');
+      video.src=item.url; video.muted=true; video.preload='metadata';
+      video.onloadeddata=()=>{video.currentTime=Math.min(3,video.duration*.1);};
+      video.onseeked=async()=>{
+        try{
+          const c=document.createElement('canvas');
+          c.width=Math.min(video.videoWidth,1024);
+          c.height=Math.round(video.videoHeight*(c.width/video.videoWidth));
+          c.getContext('2d').drawImage(video,0,0,c.width,c.height);
+          res({data:c.toDataURL('image/jpeg',.85).split(',')[1],type:'image/jpeg'});
+        }catch(e){rej(new Error('Erro ao capturar frame'));}
       };
-      video.onseeked = async () => {
-        try {
-          const canvas = document.createElement('canvas');
-          canvas.width = Math.min(video.videoWidth, 1024);
-          canvas.height = Math.round(video.videoHeight * (canvas.width / video.videoWidth));
-          canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-          const b64 = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
-          resolve({ data: b64, type: 'image/jpeg' });
-        } catch(e) { reject(new Error('Erro ao capturar frame: ' + e.message)); }
-      };
-      video.onerror = () => reject(new Error('Não foi possível carregar o vídeo para análise'));
+      video.onerror=()=>rej(new Error('Não foi possível carregar o vídeo'));
       video.load();
     });
   }
 }
 
-async function redimensionarImagem(dataUrl, maxW=1280) {
-  return new Promise(resolve => {
-    const img = new Image();
-    img.onload = () => {
-      const r = Math.min(maxW / img.width, maxW / img.height, 1);
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(img.width * r);
-      canvas.height = Math.round(img.height * r);
-      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL('image/jpeg', 0.88).split(',')[1]);
+async function redimensionar(dataUrl,maxW=1280){
+  return new Promise(res=>{
+    const img=new Image();
+    img.onload=()=>{
+      const r=Math.min(maxW/img.width,maxW/img.height,1);
+      const c=document.createElement('canvas');
+      c.width=Math.round(img.width*r); c.height=Math.round(img.height*r);
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      res(c.toDataURL('image/jpeg',.87).split(',')[1]);
     };
-    img.src = dataUrl;
+    img.src=dataUrl;
   });
 }
 
-async function chamarClaudeIA(imageData, apiKey) {
-  const prefs = JSON.parse(localStorage.getItem('ct_prefs') || '{}');
-  const bioma = prefs.bioma || 'brasil_geral';
-  const modelo = localStorage.getItem('ct_model') || 'gemini-2.5-flash';
-  const biomaMap = {
-    mata_atlantica: 'Mata Atlântica brasileira',
-    cerrado: 'Cerrado brasileiro',
-    pantanal: 'Pantanal brasileiro',
-    amazonia: 'Amazônia brasileira',
-    caatinga: 'Caatinga brasileira',
-    pampa: 'Pampa gaúcho / RS',
-    brasil_geral: 'Brasil (bioma não especificado)',
-  };
-
-  const prompt = `Você é um especialista em fauna selvagem do(a) ${biomaMap[bioma]}.
+async function chamarGemini(imgData,apiKey) {
+  const prefs=JSON.parse(localStorage.getItem('ct_prefs')||'{}');
+  const bioma=prefs.bioma||'brasil_geral';
+  const modelo=localStorage.getItem('ct_model')||'gemini-2.5-flash';
+  const biomaMap={mata_atlantica:'Mata Atlântica',cerrado:'Cerrado',pantanal:'Pantanal',amazonia:'Amazônia',caatinga:'Caatinga',pampa:'Pampa gaúcho',brasil_geral:'Brasil'};
+  const prompt=`Você é um especialista em fauna selvagem do ${biomaMap[bioma]||'Brasil'}.
 Analise esta imagem de câmera trap e identifique a espécie animal presente.
-
-Retorne SOMENTE um JSON válido, sem texto adicional, markdown ou explicação:
-{
-  "species_popular": "nome popular em português (ou 'Indeterminado' se não for possível)",
-  "species_scientific": "Gênero espécie (ou 'sp.' se não for possível)",
-  "count": <número inteiro de indivíduos visíveis>,
-  "sex": "Macho" | "Fêmea" | "Indeterminado" | null,
-  "age": "Adulto" | "Jovem" | "Filhote" | "Indeterminado" | null,
-  "behavior": "descrição curta do comportamento visível (ex: Passagem, Forrageamento...)",
-  "confidence": "alta" | "média" | "baixa",
-  "notes": "observação sobre qualidade de imagem, visibilidade, ou características identificadoras (máx 100 chars)"
-}
-
-Se não houver animal visível: species_popular="Sem animal visível", species_scientific="N/A", count=0, confidence="alta".`;
-
-  const resp = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { inline_data: { mime_type: imageData.type, data: imageData.data } },
-            { text: prompt }
-          ]
-        }],
-        generationConfig: { maxOutputTokens: 600, temperature: 0.1 }
-      })
-    }
-  );
-
-  if (!resp.ok) {
-    const err = await resp.json().catch(() => ({}));
-    throw new Error(err.error?.message || `Erro HTTP ${resp.status}`);
-  }
-
-  const data = await resp.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  const match = text.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error('Resposta inesperada da IA: ' + text.substring(0,100));
+Retorne SOMENTE um JSON válido, sem texto adicional ou markdown:
+{"species_popular":"nome popular em português","species_scientific":"Gênero espécie","count":<número inteiro>,"sex":"Macho"|"Fêmea"|"Indeterminado"|null,"age":"Adulto"|"Jovem"|"Filhote"|"Indeterminado"|null,"behavior":"comportamento observado","confidence":"alta"|"média"|"baixa","notes":"observação sobre qualidade ou identificação (máx 80 chars)"}
+Se não houver animal: species_popular="Sem animal visível",species_scientific="N/A",count=0,confidence="alta".`;
+  const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${apiKey}`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:imgData.type,data:imgData.data}},{text:prompt}]}],generationConfig:{maxOutputTokens:600,temperature:.1}})
+  });
+  if(!resp.ok){const e=await resp.json().catch(()=>({}));throw new Error(e.error?.message||`Erro HTTP ${resp.status}`);}
+  const data=await resp.json();
+  const text=data.candidates?.[0]?.content?.parts?.[0]?.text||'';
+  const match=text.match(/\{[\s\S]*\}/);
+  if(!match) throw new Error('Resposta inesperada: '+text.substring(0,80));
   return JSON.parse(match[0]);
 }
 
-// ════════════════════════════════════════
-// SALVAR REGISTROS
-// ════════════════════════════════════════
-function salvarRegistroAtual() {
-  const idx = parseInt(document.getElementById('f_currentIdx').value);
-  const especie = document.getElementById('f_nome_popular').value.trim();
-  const camera = document.getElementById('f_camera').value.trim();
-  const data = document.getElementById('f_data').value;
-
-  if (!especie || !camera || !data) {
-    toast('⚠️ Preencha pelo menos: Câmera, Data e Espécie', true); return;
-  }
-
-  const reg = {
-    id: Date.now(),
-    data, hora: document.getElementById('f_hora').value,
-    camera, ponto: document.getElementById('f_ponto').value.trim(),
-    nome_popular: especie,
-    nome_cientifico: document.getElementById('f_nome_cientifico').value.trim(),
-    individuos: document.getElementById('f_individuos').value || 1,
-    sexo: document.getElementById('f_sexo').value,
-    idade: document.getElementById('f_idade').value,
-    comportamento: document.getElementById('f_comportamento').value,
-    arquivo: document.getElementById('f_arquivo').value.trim(),
-    observador: document.getElementById('f_observador').value.trim(),
-    obs: document.getElementById('f_obs').value.trim(),
-    confianca_ia: document.getElementById('f_confianca').value,
-    via_ia: !!document.getElementById('f_confianca').value,
+// ═══════════════════════════════════════════
+// SALVAR REGISTRO DE ESPÉCIE
+// ═══════════════════════════════════════════
+async function salvarRegistroAtual() {
+  const especie=document.getElementById('f_nome_popular').value.trim();
+  const camera=document.getElementById('f_camera').value.trim();
+  const data=document.getElementById('f_data').value;
+  if(!especie||!camera||!data){toast('⚠️ Preencha Câmera, Data e Espécie',true);return;}
+  const ponto=pontos.find(p=>p.nome===camera);
+  const reg={
+    id:Date.now().toString(),
+    data, hora:document.getElementById('f_hora').value,
+    camera, ponto_id:ponto?.id||'',
+    lat:ponto?.lat||null, lng:ponto?.lng||null,
+    nome_popular:especie,
+    nome_cientifico:document.getElementById('f_nome_cientifico').value.trim(),
+    individuos:document.getElementById('f_individuos').value||1,
+    sexo:document.getElementById('f_sexo').value,
+    idade:document.getElementById('f_idade').value,
+    comportamento:document.getElementById('f_comportamento').value,
+    arquivo:document.getElementById('f_arquivo').value.trim(),
+    observador:document.getElementById('f_observador').value.trim(),
+    obs:document.getElementById('f_obs').value.trim(),
+    confianca_ia:document.getElementById('f_confianca').value,
+    via_ia:!!document.getElementById('f_confianca').value,
   };
-
   registros.push(reg);
-  salvarLocal();
-  renderTabela();
-  atualizarBadges();
-  atualizarDataLists();
-
-  // Marcar como salvo na fila
-  if (!isNaN(idx) && fileQueue[idx]) {
-    fileQueue[idx].status = 'saved';
-    renderQueue();
-  }
-
-  toast('💾 Salvo: ' + especie);
-  document.getElementById('iaBanner').style.display = 'none';
-
-  // Auto-avançar
-  const prefs = JSON.parse(localStorage.getItem('ct_prefs') || '{}');
-  if (prefs.aposRegistro !== 'manter') {
-    setTimeout(proximoItem, 300);
-  }
+  if(currentUser) await salvarFirestore('registros',reg);
+  else salvarLocal();
+  renderTabela(); atualizarBadges(); atualizarDataLists();
+  const idx=parseInt(document.getElementById('f_currentIdx').value);
+  if(!isNaN(idx)&&fileQueue[idx]){fileQueue[idx].status='saved';renderQueue();}
+  toast('💾 '+especie);
+  document.getElementById('iaBanner').style.display='none';
+  const prefs=JSON.parse(localStorage.getItem('ct_prefs')||'{}');
+  if(prefs.aposRegistro!=='manter') setTimeout(proximoItem,300);
 }
 
-// ════════════════════════════════════════
-// METADADOS DO ARQUIVO
-// ════════════════════════════════════════
-function extrairMetadados(nome) {
-  const r = { data: null, hora: null, camera: null, dataFmt: null };
-  const mCam = nome.match(/^(CAM\d+|CT\d+|TRAP\d+|cam\d+)/i);
-  if (mCam) r.camera = mCam[1].toUpperCase();
-  let mData = nome.match(/(\d{4})[-_]?(\d{2})[-_]?(\d{2})/);
-  if (mData) { const [_,y,m,d] = mData; r.data = `${y}-${m}-${d}`; r.dataFmt = `${d}/${m}/${y}`; }
-  else { mData = nome.match(/(\d{2})[-_](\d{2})[-_](\d{4})/); if(mData){ const[_,d,m,y]=mData; r.data=`${y}-${m}-${d}`; r.dataFmt=`${d}/${m}/${y}`; } }
-  const mH = nome.match(/[_-](\d{2})[-:]?(\d{2})[-:]?(\d{2})(?:\D|$)/);
-  if (mH && parseInt(mH[1]) < 24) r.hora = `${mH[1]}:${mH[2]}`;
-  return r;
-}
-
-// ════════════════════════════════════════
-// AUTOCOMPLETE
-// ════════════════════════════════════════
-let acIdx = -1;
-function buscaEspecie(q) {
-  const list = document.getElementById('autocompleteList');
-  if (q.length < 2) { list.style.display = 'none'; return; }
-  const matches = ESPECIES.filter(e => e.p.toLowerCase().includes(q.toLowerCase()) || e.s.toLowerCase().includes(q.toLowerCase())).slice(0,8);
-  if (!matches.length) { list.style.display = 'none'; return; }
-  list.innerHTML = matches.map((e,i) => `<div class="autocomplete-item" data-idx="${i}" onclick="selEspecie('${e.p.replace(/'/g,"\\'")}','${e.s}')">${e.p}<br><span class="sci">${e.s}</span></div>`).join('');
-  list.style.display = 'block'; acIdx = -1;
-}
-function selEspecie(p, s) {
-  document.getElementById('f_nome_popular').value = p;
-  document.getElementById('f_nome_cientifico').value = s;
-  document.getElementById('autocompleteList').style.display = 'none';
-}
-document.addEventListener('keydown', e => {
-  const l = document.getElementById('autocompleteList');
-  if (l.style.display === 'none') return;
-  const items = l.querySelectorAll('.autocomplete-item');
-  if (e.key==='ArrowDown') acIdx = Math.min(acIdx+1, items.length-1);
-  else if (e.key==='ArrowUp') acIdx = Math.max(acIdx-1, 0);
-  else if (e.key==='Enter' && acIdx>=0) { items[acIdx].click(); e.preventDefault(); return; }
-  else if (e.key==='Escape') { l.style.display='none'; return; }
-  items.forEach((it,i) => it.classList.toggle('sel', i===acIdx));
-});
-document.addEventListener('click', e => { if(!e.target.closest('.autocomplete-wrap')) document.getElementById('autocompleteList').style.display='none'; });
-
-// ════════════════════════════════════════
+// ═══════════════════════════════════════════
 // GESTÃO DE CÂMERAS
-// ════════════════════════════════════════
-function toggleGestaoFields() {
-  const tipo = document.getElementById('g_tipo').value;
-  document.getElementById('g_novaCamera_wrap').style.display = tipo === 'troca' ? 'block' : 'none';
-}
-function salvarGestao() {
-  const data = document.getElementById('g_data').value;
-  const camera = document.getElementById('g_camera').value.trim();
-  const tipo = document.getElementById('g_tipo').value;
-  if (!data || !camera || !tipo) { toast('⚠️ Preencha Data, Câmera e Tipo', true); return; }
-  gestaoEventos.push({ id: Date.now(), data, camera, ponto: document.getElementById('g_ponto').value.trim(), tipo, nova_camera: document.getElementById('g_nova_camera').value.trim(), sd: document.getElementById('g_sd').value, bateria: document.getElementById('g_bateria').value, responsavel: document.getElementById('g_responsavel').value.trim(), obs: document.getElementById('g_obs').value.trim() });
-  salvarLocal(); renderGestaoTabela(); atualizarBadges(); atualizarDataLists();
+// ═══════════════════════════════════════════
+function toggleGestaoFields(){document.getElementById('g_novaCamera_wrap').style.display=document.getElementById('g_tipo').value==='troca'?'block':'none';}
+
+async function salvarGestao() {
+  const data=document.getElementById('g_data').value;
+  const camera=document.getElementById('g_camera').value.trim();
+  const tipo=document.getElementById('g_tipo').value;
+  if(!data||!camera||!tipo){toast('⚠️ Preencha Data, Câmera e Tipo',true);return;}
+  const evento={id:Date.now().toString(),data,camera,tipo,nova_camera:document.getElementById('g_nova_camera').value.trim(),sd:document.getElementById('g_sd').value,bateria:document.getElementById('g_bateria').value,responsavel:document.getElementById('g_responsavel').value.trim(),obs:document.getElementById('g_obs').value.trim()};
+  gestaoEventos.push(evento);
+  if(currentUser) await salvarFirestore('gestao',evento);
+  else salvarLocal();
+  renderGestaoTabela(); atualizarBadges(); atualizarDataLists();
   toast('✅ Evento salvo!'); limparGestao();
 }
-function limparGestao() {
-  ['g_camera','g_ponto','g_nova_camera','g_responsavel','g_obs'].forEach(id => document.getElementById(id).value='');
-  document.getElementById('g_tipo').value = ''; document.getElementById('g_sd').value = ''; document.getElementById('g_bateria').value = '';
-  document.getElementById('g_data').value = new Date().toISOString().split('T')[0]; toggleGestaoFields();
-}
-function tipoLabel(t) { return {instalacao:'Instalação',troca:'Troca',retirada:'Retirada',desativacao:'Desativação',manutencao:'Manutenção',falha:'Falha'}[t]||t; }
-function renderGestaoList() {
-  const el = document.getElementById('gestaoList');
-  if (!gestaoEventos.length) { el.innerHTML='<span style="color:#aaa;font-style:italic">Nenhum evento.</span>'; return; }
-  el.innerHTML = [...gestaoEventos].reverse().slice(0,8).map(e => `
-    <div style="padding:10px;border:1px solid var(--borda);border-radius:8px;margin-bottom:8px;font-size:.82rem">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-        <b>${e.camera}</b> · <span style="color:#666">${e.ponto||'—'}</span>
-        <span style="background:var(--verde-bg);color:var(--verde);padding:2px 8px;border-radius:10px;font-size:.72rem;font-weight:700">${tipoLabel(e.tipo)}</span>
+
+function limparGestao(){['g_camera','g_nova_camera','g_responsavel','g_obs'].forEach(id=>document.getElementById(id).value='');document.getElementById('g_tipo').value='';document.getElementById('g_sd').value='';document.getElementById('g_bateria').value='';document.getElementById('g_data').value=new Date().toISOString().split('T')[0];toggleGestaoFields();}
+function tipoLabel(t){return{instalacao:'Instalação',troca:'Troca',retirada:'Retirada',desativacao:'Desativação',manutencao:'Manutenção',falha:'Falha'}[t]||t;}
+
+function renderGestaoList(){
+  const el=document.getElementById('gestaoList');
+  if(!gestaoEventos.length){el.innerHTML='<span style="color:#aaa;font-style:italic">Nenhum evento.</span>';return;}
+  el.innerHTML=[...gestaoEventos].reverse().slice(0,6).map(e=>`
+    <div style="padding:9px;border:1px solid var(--borda);border-radius:8px;margin-bottom:7px;font-size:.8rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+        <b>${e.camera}</b>
+        <span style="background:var(--verde-bg);color:var(--verde);padding:2px 7px;border-radius:10px;font-size:.7rem;font-weight:700">${tipoLabel(e.tipo)}</span>
       </div>
       <div style="color:#555">${fmtDate(e.data)} · ${e.responsavel||'—'}</div>
-      ${e.obs?`<div style="color:#888;margin-top:3px">${e.obs}</div>`:''}
+      ${e.obs?`<div style="color:#888;margin-top:2px">${e.obs}</div>`:''}
     </div>`).join('');
 }
 
-// ════════════════════════════════════════
+// ═══════════════════════════════════════════
 // RENDER TABELAS
-// ════════════════════════════════════════
+// ═══════════════════════════════════════════
 function renderTabela() {
-  const tbody = document.getElementById('tabelaBody');
-  tbody.innerHTML = registros.map((r,i) => `<tr>
-    <td>${i+1}</td><td>${fmtDate(r.data)}</td><td>${r.hora||'—'}</td>
-    <td><b>${r.camera}</b></td><td>${r.ponto||'—'}</td>
+  const tbody=document.getElementById('tabelaBody');
+  tbody.innerHTML=registros.map((r,i)=>`<tr>
+    <td>${i+1}</td><td>${fmtDate(r.data)}</td><td>${r.hora||'—'}</td><td><b>${r.camera}</b></td>
+    <td style="font-size:.75rem;color:#555">${r.lat!=null?r.lat.toFixed(4):'—'}</td>
+    <td style="font-size:.75rem;color:#555">${r.lng!=null?r.lng.toFixed(4):'—'}</td>
     <td>${r.nome_popular}</td><td><i>${r.nome_cientifico||'—'}</i></td>
     <td>${r.individuos}</td><td>${r.sexo||'—'}</td><td>${r.idade||'—'}</td>
     <td>${r.comportamento||'—'}</td>
-    <td>${r.confianca_ia ? `<span class="conf-badge conf-${r.confianca_ia}">${r.confianca_ia}</span>` : r.via_ia ? '—' : '<span style="color:#aaa;font-size:.75rem">manual</span>'}</td>
-    <td style="font-size:.75rem;color:#888;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.arquivo}">${r.arquivo||'—'}</td>
-    <td>${r.observador||'—'}</td>
-    <td style="max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.obs}">${r.obs||'—'}</td>
-    <td><button class="del-btn" onclick="deletarReg(${r.id})">✕</button></td>
-  </tr>`).join('') || '<tr><td colspan="16" style="text-align:center;color:#aaa;padding:16px">Nenhum registro ainda</td></tr>';
-
-  document.getElementById('countLabel').textContent = `${registros.length} registros de espécies · ${gestaoEventos.length} eventos de câmera`;
+    <td>${r.confianca_ia?`<span class="conf-badge conf-${r.confianca_ia}">${r.confianca_ia}</span>`:'<span style="color:#aaa;font-size:.72rem">manual</span>'}</td>
+    <td style="font-size:.73rem;color:#888;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.arquivo||'—'}</td>
+    <td style="max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.obs||'—'}</td>
+    <td><button class="del-btn" onclick="deletarReg('${r.id}')">✕</button></td>
+  </tr>`).join('')||'<tr><td colspan="16" style="text-align:center;color:#aaa;padding:14px">Nenhum registro</td></tr>';
+  document.getElementById('countLabel').textContent=`${registros.length} registros · ${gestaoEventos.length} eventos · ${pontos.length} pontos`;
 }
+
 function renderGestaoTabela() {
-  const tbody = document.getElementById('gestaoBody');
-  tbody.innerHTML = gestaoEventos.map((e,i) => `<tr>
-    <td>${i+1}</td><td>${fmtDate(e.data)}</td><td><b>${e.camera}</b></td><td>${e.ponto||'—'}</td>
-    <td><span style="background:var(--verde-bg);color:var(--verde);padding:2px 7px;border-radius:10px;font-size:.72rem;font-weight:700">${tipoLabel(e.tipo)}</span></td>
-    <td>${e.nova_camera||'—'}</td><td>${e.sd||'—'}</td><td>${e.bateria||'—'}</td>
-    <td>${e.responsavel||'—'}</td><td style="max-width:100px;overflow:hidden;text-overflow:ellipsis" title="${e.obs}">${e.obs||'—'}</td>
-    <td><button class="del-btn" onclick="deletarGestao(${e.id})">✕</button></td>
-  </tr>`).join('') || '<tr><td colspan="11" style="text-align:center;color:#aaa;padding:16px">Nenhum evento</td></tr>';
+  const tbody=document.getElementById('gestaoBody');
+  tbody.innerHTML=gestaoEventos.map((e,i)=>`<tr>
+    <td>${i+1}</td><td>${fmtDate(e.data)}</td><td><b>${e.camera}</b></td>
+    <td><span style="background:var(--verde-bg);color:var(--verde);padding:2px 6px;border-radius:10px;font-size:.7rem;font-weight:700">${tipoLabel(e.tipo)}</span></td>
+    <td>${e.sd||'—'}</td><td>${e.bateria||'—'}</td><td>${e.responsavel||'—'}</td>
+    <td style="max-width:90px;overflow:hidden;text-overflow:ellipsis">${e.obs||'—'}</td>
+    <td><button class="del-btn" onclick="deletarGestao('${e.id}')">✕</button></td>
+  </tr>`).join('')||'<tr><td colspan="9" style="text-align:center;color:#aaa;padding:14px">Nenhum evento</td></tr>';
   renderGestaoList();
 }
-function deletarReg(id) { if(!confirm('Remover?'))return; registros=registros.filter(r=>r.id!==id); salvarLocal(); renderTabela(); atualizarBadges(); }
-function deletarGestao(id) { if(!confirm('Remover?'))return; gestaoEventos=gestaoEventos.filter(e=>e.id!==id); salvarLocal(); renderGestaoTabela(); atualizarBadges(); }
-function limparTudo() { if(!confirm('Apagar TODOS os registros?\nDica: exporte primeiro!'))return; registros=[]; gestaoEventos=[]; salvarLocal(); renderTabela(); renderGestaoTabela(); atualizarBadges(); }
 
-// ════════════════════════════════════════
-// EXPORTAÇÃO EXCEL
-// ════════════════════════════════════════
-function exportarExcel() {
-  if (!registros.length && !gestaoEventos.length) { toast('Nenhum dado para exportar.', true); return; }
-  const wb = XLSX.utils.book_new();
+async function deletarReg(id){if(!confirm('Remover?'))return;registros=registros.filter(r=>r.id!==id);if(currentUser)await deletarFirestore('registros',id);else salvarLocal();renderTabela();atualizarBadges();}
+async function deletarGestao(id){if(!confirm('Remover?'))return;gestaoEventos=gestaoEventos.filter(e=>e.id!==id);if(currentUser)await deletarFirestore('gestao',id);else salvarLocal();renderGestaoTabela();atualizarBadges();}
+function limparTudo(){if(!confirm('Apagar TUDO? Exporte primeiro!'))return;registros=[];gestaoEventos=[];if(!currentUser)salvarLocal();renderTabela();renderGestaoTabela();atualizarBadges();}
 
-  const cols1 = ['Data','Hora','Câmera','Ponto','Nome Popular','Nome Científico','Nº Indivíduos','Sexo','Idade','Comportamento','Confiança IA','Via IA','Arquivo','Observador','Observações'];
-  const rows1 = registros.map(r => [r.data, r.hora||'', r.camera, r.ponto||'', r.nome_popular, r.nome_cientifico||'', r.individuos, r.sexo||'', r.idade||'', r.comportamento||'', r.confianca_ia||'', r.via_ia?'Sim':'Não', r.arquivo||'', r.observador||'', r.obs||'']);
-  const ws1 = XLSX.utils.aoa_to_sheet([cols1, ...rows1]);
-  ws1['!cols'] = cols1.map((_,i) => ({ wch: [10,8,10,16,20,24,10,14,14,22,12,8,20,16,30][i]||15 }));
-  XLSX.utils.book_append_sheet(wb, ws1, 'Registros de Espécies');
-
-  const cols2 = ['Data','Câmera','Ponto','Tipo de Evento','Nova Câmera','SD Card','Bateria','Responsável','Observações'];
-  const rows2 = gestaoEventos.map(e => [e.data, e.camera, e.ponto||'', tipoLabel(e.tipo), e.nova_camera||'', e.sd||'', e.bateria||'', e.responsavel||'', e.obs||'']);
-  const ws2 = XLSX.utils.aoa_to_sheet([cols2, ...rows2]);
-  XLSX.utils.book_append_sheet(wb, ws2, 'Gestão de Câmeras');
-
-  const data = new Date().toISOString().replace(/[:.]/g,'-').slice(0,16);
-  XLSX.writeFile(wb, `camera_trap_${data}.xlsx`);
+// ═══════════════════════════════════════════
+// EXPORTAÇÃO
+// ═══════════════════════════════════════════
+function exportarExcel(){
+  if(!registros.length&&!gestaoEventos.length&&!pontos.length){toast('Nenhum dado.',true);return;}
+  const wb=XLSX.utils.book_new();
+  const cols1=['Data','Hora','Câmera','Latitude','Longitude','Espécie','Nome Científico','Nº','Sexo','Idade','Comportamento','Confiança IA','Arquivo','Observador','Observações'];
+  const rows1=registros.map(r=>[r.data,r.hora||'',r.camera,r.lat||'',r.lng||'',r.nome_popular,r.nome_cientifico||'',r.individuos,r.sexo||'',r.idade||'',r.comportamento||'',r.confianca_ia||'',r.arquivo||'',r.observador||'',r.obs||'']);
+  const ws1=XLSX.utils.aoa_to_sheet([cols1,...rows1]);
+  XLSX.utils.book_append_sheet(wb,ws1,'Registros Espécies');
+  const cols2=['Nome','Latitude','Longitude','Altitude','Bioma','Status','Notas'];
+  const rows2=pontos.map(p=>[p.nome,p.lat||'',p.lng||'',p.alt||'',p.bioma||'',p.status||'ativo',p.notas||'']);
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([cols2,...rows2]),'Pontos Câmeras');
+  const cols3=['Data','Câmera','Evento','SD','Bateria','Responsável','Obs'];
+  const rows3=gestaoEventos.map(e=>[e.data,e.camera,tipoLabel(e.tipo),e.sd||'',e.bateria||'',e.responsavel||'',e.obs||'']);
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([cols3,...rows3]),'Gestão Câmeras');
+  XLSX.writeFile(wb,`camera_trap_${new Date().toISOString().slice(0,10)}.xlsx`);
   toast('📊 Excel exportado!');
 }
 
-function exportarCSV() {
-  let csv = 'Data,Hora,Câmera,Ponto,Nome Popular,Nome Científico,Nº Indivíduos,Sexo,Idade,Comportamento,Confiança IA,Arquivo,Observador,Observações\n';
-  csv += registros.map(r => [r.data,r.hora||'',r.camera,r.ponto||'',r.nome_popular,r.nome_cientifico||'',r.individuos,r.sexo||'',r.idade||'',r.comportamento||'',r.confianca_ia||'',r.arquivo||'',r.observador||'',r.obs||''].map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
-  const d = new Date().toISOString().replace(/[:.]/g,'-').slice(0,16);
-  const blob = new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`camera_trap_${d}.csv`; a.click();
+function exportarCSV(){
+  let csv='Data,Hora,Câmera,Latitude,Longitude,Espécie,Nome Científico,Nº,Sexo,Idade,Comportamento,Arquivo,Obs\n';
+  csv+=registros.map(r=>[r.data,r.hora||'',r.camera,r.lat||'',r.lng||'',r.nome_popular,r.nome_cientifico||'',r.individuos,r.sexo||'',r.idade||'',r.comportamento||'',r.arquivo||'',r.obs||''].map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`camera_trap_${new Date().toISOString().slice(0,10)}.csv`;a.click();
   toast('📥 CSV exportado!');
 }
 
-// ════════════════════════════════════════
-// CONFIGURAÇÕES / API KEY
-// ════════════════════════════════════════
-function salvarApiKey() {
-  const key = document.getElementById('apiKeyInput').value.trim();
-  const model = document.getElementById('modelSelect').value;
-  if (key) localStorage.setItem('ct_apikey', key);
-  if (model) localStorage.setItem('ct_model', model);
-  atualizarApiStatus();
+// ═══════════════════════════════════════════
+// AUTOCOMPLETE
+// ═══════════════════════════════════════════
+let acIdx=-1;
+function buscaEspecie(q){
+  const list=document.getElementById('autocompleteList');
+  if(q.length<2){list.style.display='none';return;}
+  const matches=ESPECIES.filter(e=>e.p.toLowerCase().includes(q.toLowerCase())||e.s.toLowerCase().includes(q.toLowerCase())).slice(0,8);
+  if(!matches.length){list.style.display='none';return;}
+  list.innerHTML=matches.map((e,i)=>`<div class="autocomplete-item" onclick="selEspecie('${e.p.replace(/'/g,"\\'")}','${e.s}')">${e.p}<br><span class="sci">${e.s}</span></div>`).join('');
+  list.style.display='block'; acIdx=-1;
 }
-function removerApiKey() { localStorage.removeItem('ct_apikey'); document.getElementById('apiKeyInput').value=''; atualizarApiStatus(); toast('Chave API removida.'); }
-function toggleApiKeyVisibility() {
-  const inp = document.getElementById('apiKeyInput');
-  inp.type = inp.type === 'password' ? 'text' : 'password';
+function selEspecie(p,s){document.getElementById('f_nome_popular').value=p;document.getElementById('f_nome_cientifico').value=s;document.getElementById('autocompleteList').style.display='none';}
+document.addEventListener('keydown',e=>{
+  const l=document.getElementById('autocompleteList');
+  if(l.style.display==='none') return;
+  const items=l.querySelectorAll('.autocomplete-item');
+  if(e.key==='ArrowDown') acIdx=Math.min(acIdx+1,items.length-1);
+  else if(e.key==='ArrowUp') acIdx=Math.max(acIdx-1,0);
+  else if(e.key==='Enter'&&acIdx>=0){items[acIdx].click();e.preventDefault();return;}
+  else if(e.key==='Escape'){l.style.display='none';return;}
+  items.forEach((it,i)=>it.classList.toggle('sel',i===acIdx));
+});
+document.addEventListener('click',e=>{if(!e.target.closest('.autocomplete-wrap'))document.getElementById('autocompleteList').style.display='none';});
+
+// ═══════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════
+function salvarApiKey(){const k=document.getElementById('apiKeyInput').value.trim();const m=document.getElementById('modelSelect').value;if(k)localStorage.setItem('ct_apikey',k);if(m)localStorage.setItem('ct_model',m);atualizarApiStatus();}
+function removerApiKey(){localStorage.removeItem('ct_apikey');document.getElementById('apiKeyInput').value='';atualizarApiStatus();toast('Chave API removida.');}
+function toggleApiKeyVisibility(){const i=document.getElementById('apiKeyInput');i.type=i.type==='password'?'text':'password';}
+function atualizarApiStatus(){
+  const k=localStorage.getItem('ct_apikey');
+  const btn=document.getElementById('apiStatusBtn');
+  const el=document.getElementById('apiKeyStatus');
+  if(k){btn.className='api-status ok';btn.textContent='🤖 IA ✓';if(el)el.innerHTML='<span style="color:var(--verde);font-weight:700">✅ Gemini configurado</span>';}
+  else{btn.className='api-status missing';btn.textContent='⚠️ IA';if(el)el.innerHTML='<span style="color:#dc2626">❌ Configure a API Key do Gemini</span>';}
 }
-function atualizarApiStatus() {
-  const key = localStorage.getItem('ct_apikey');
-  const btn = document.getElementById('apiStatusBtn');
-  const statusEl = document.getElementById('apiKeyStatus');
-  if (key) {
-    btn.className = 'api-status ok';
-    btn.textContent = '🤖 IA Ativa';
-    if (statusEl) statusEl.innerHTML = '<span style="color:var(--verde);font-weight:700">✅ API Key do Gemini configurada (gratuito).</span>';
-    // Preencher input mascarado
-    const inp = document.getElementById('apiKeyInput');
-    if (inp && !inp.value) inp.value = key;
-  } else {
-    btn.className = 'api-status missing';
-    btn.textContent = '⚠️ Configurar IA';
-    if (statusEl) statusEl.innerHTML = '<span style="color:#dc2626">❌ API Key não configurada. Acesse <a href="https://aistudio.google.com/apikey" target="_blank" style="color:#dc2626;font-weight:700">aistudio.google.com/apikey</a> para criar gratuitamente.</span>';
-  }
-}
-async function testarApiKey() {
-  const key = localStorage.getItem('ct_apikey');
-  if (!key) { toast('Configure a API key primeiro.', true); return; }
-  const btn = event.target;
-  btn.textContent = '⏳ Testando...'; btn.disabled = true;
-  try {
-    const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: 'Responda apenas: OK' }] }], generationConfig: { maxOutputTokens: 5 } })
-      }
-    );
-    if (resp.ok) { document.getElementById('apiKeyStatus').innerHTML='<span style="color:var(--verde);font-weight:700">✅ Conexão com Gemini bem-sucedida!</span>'; toast('✅ API Key do Gemini válida!'); }
-    else { const e=await resp.json(); throw new Error(e.error?.message||'Erro '+resp.status); }
-  } catch(e) { document.getElementById('apiKeyStatus').innerHTML=`<span style="color:#dc2626">❌ Erro: ${e.message}</span>`; toast('⚠️ '+e.message, true); }
-  btn.textContent='🔬 Testar Conexão'; btn.disabled=false;
-}
-function salvarPrefs() {
-  const prefs = {
-    bioma: document.getElementById('biomaSelect').value,
-    observador: document.getElementById('observadorPadrao').value,
-    aposRegistro: document.getElementById('aposRegistro').value,
-  };
-  localStorage.setItem('ct_prefs', JSON.stringify(prefs));
-  toast('✅ Preferências salvas');
-}
-function carregarPrefs() {
-  const key = localStorage.getItem('ct_apikey');
-  if (key) document.getElementById('apiKeyInput').value = key;
-  const model = localStorage.getItem('ct_model');
-  if (model) document.getElementById('modelSelect').value = model;
-  const prefs = JSON.parse(localStorage.getItem('ct_prefs') || '{}');
-  if (prefs.bioma) document.getElementById('biomaSelect').value = prefs.bioma;
-  if (prefs.observador) document.getElementById('observadorPadrao').value = prefs.observador;
-  if (prefs.aposRegistro) document.getElementById('aposRegistro').value = prefs.aposRegistro;
+async function testarApiKey(){
+  const k=localStorage.getItem('ct_apikey');
+  if(!k){toast('Configure a API key primeiro.',true);return;}
+  const btn=event.target;btn.textContent='⏳...';btn.disabled=true;
+  try{
+    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${k}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:'OK'}]}],generationConfig:{maxOutputTokens:5}})});
+    if(r.ok){document.getElementById('apiKeyStatus').innerHTML='<span style="color:var(--verde);font-weight:700">✅ Conexão OK!</span>';toast('✅ Gemini conectado!');}
+    else{const e=await r.json();throw new Error(e.error?.message||'Erro '+r.status);}
+  }catch(e){document.getElementById('apiKeyStatus').innerHTML=`<span style="color:#dc2626">❌ ${e.message}</span>`;toast('⚠️ '+e.message,true);}
+  btn.textContent='🔬 Testar';btn.disabled=false;
 }
 
-// ════════════════════════════════════════
+function salvarFirebaseConfig(){
+  const raw=document.getElementById('firebaseConfigInput').value.trim();
+  try{
+    const cfg=JSON.parse(raw);
+    if(!cfg.apiKey||!cfg.projectId) throw new Error('Config incompleto');
+    localStorage.setItem('ct_firebase',JSON.stringify(cfg));
+    document.getElementById('firebaseStatus').innerHTML='<span style="color:var(--verde);font-weight:700">✅ Salvo! Recarregue a página para ativar o login.</span>';
+    toast('✅ Firebase configurado! Recarregue a página.');
+  }catch(e){document.getElementById('firebaseStatus').innerHTML=`<span style="color:#dc2626">❌ JSON inválido: ${e.message}</span>`;}
+}
+function removerFirebaseConfig(){if(!confirm('Remover configuração Firebase?'))return;localStorage.removeItem('ct_firebase');document.getElementById('firebaseConfigInput').value='';document.getElementById('firebaseStatus').innerHTML='<span style="color:#888">Removido.</span>';toast('Firebase removido.');}
+
+function salvarPrefs(){localStorage.setItem('ct_prefs',JSON.stringify({bioma:document.getElementById('biomaSelect').value,observador:document.getElementById('observadorPadrao').value,aposRegistro:document.getElementById('aposRegistro').value}));toast('✅ Preferências salvas');}
+function carregarPrefs(){
+  const k=localStorage.getItem('ct_apikey');if(k) document.getElementById('apiKeyInput').value=k;
+  const m=localStorage.getItem('ct_model');if(m) document.getElementById('modelSelect').value=m;
+  const fb=localStorage.getItem('ct_firebase');if(fb){try{document.getElementById('firebaseConfigInput').value=JSON.stringify(JSON.parse(fb),null,2);document.getElementById('firebaseStatus').innerHTML='<span style="color:var(--verde)">✅ Firebase configurado</span>';}catch(e){}}
+  const p=JSON.parse(localStorage.getItem('ct_prefs')||'{}');
+  if(p.bioma) document.getElementById('biomaSelect').value=p.bioma;
+  if(p.observador) document.getElementById('observadorPadrao').value=p.observador;
+  if(p.aposRegistro) document.getElementById('aposRegistro').value=p.aposRegistro;
+}
+
+// ═══════════════════════════════════════════
 // UTILITÁRIOS
-// ════════════════════════════════════════
-function salvarLocal() { localStorage.setItem('ct_registros',JSON.stringify(registros)); localStorage.setItem('ct_gestao',JSON.stringify(gestaoEventos)); }
-function atualizarBadges() {
-  document.getElementById('badgeFila').textContent = fileQueue.filter(q=>q.status!=='saved').length;
-  document.getElementById('badgeTabela').textContent = registros.length + gestaoEventos.length;
-  document.getElementById('badgeGestao').textContent = gestaoEventos.length;
+// ═══════════════════════════════════════════
+function extrairMetadados(nome){
+  const r={data:null,hora:null,camera:null,dataFmt:null};
+  const mC=nome.match(/^(CAM\d+|CT\d+|TRAP\d+)/i);if(mC)r.camera=mC[1].toUpperCase();
+  let mD=nome.match(/(\d{4})[-_]?(\d{2})[-_]?(\d{2})/);
+  if(mD){const[_,y,m,d]=mD;r.data=`${y}-${m}-${d}`;r.dataFmt=`${d}/${m}/${y}`;}
+  const mH=nome.match(/[_-](\d{2})[-:]?(\d{2})[-:]?(\d{2})(?:\D|$)/);
+  if(mH&&parseInt(mH[1])<24)r.hora=`${mH[1]}:${mH[2]}`;
+  return r;
 }
-function atualizarDataLists() {
-  const cams = [...new Set([...registros.map(r=>r.camera),...gestaoEventos.map(e=>e.camera)].filter(Boolean))];
-  const pontos = [...new Set([...registros.map(r=>r.ponto),...gestaoEventos.map(e=>e.ponto)].filter(Boolean))];
-  const obs = [...new Set(registros.map(r=>r.observador).filter(Boolean))];
-  ['camerasList','camerasList3'].forEach(id => document.getElementById(id).innerHTML=cams.map(c=>`<option value="${c}">`).join(''));
-  ['pontosList','pontosList3'].forEach(id => document.getElementById(id).innerHTML=pontos.map(p=>`<option value="${p}">`).join(''));
-  ['observadoresList','observadoresList3'].forEach(id => document.getElementById(id).innerHTML=obs.map(o=>`<option value="${o}">`).join(''));
+function atualizarDataLists(){
+  const obs=[...new Set(registros.map(r=>r.observador).filter(Boolean))];
+  ['observadoresList','observadoresList2'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=obs.map(o=>`<option value="${o}">`).join('');});
 }
-function fmtDate(d) { if(!d)return'—'; const[y,m,dd]=d.split('-'); return `${dd}/${m}/${y}`; }
+function atualizarBadges(){
+  document.getElementById('badgeFila').textContent=fileQueue.filter(q=>q.status!=='saved').length;
+  document.getElementById('badgeTabela').textContent=registros.length+gestaoEventos.length;
+  document.getElementById('badgeGestao').textContent=gestaoEventos.length;
+  document.getElementById('badgePontos').textContent=pontos.length;
+}
+function fmtDate(d){if(!d)return'—';const[y,m,dd]=d.split('-');return`${dd}/${m}/${y}`;}
 let toastTimer;
-function toast(msg, warn=false) {
-  const el=document.getElementById('toast'); document.getElementById('toastMsg').textContent=msg;
-  el.className = warn ? 'show warn' : 'show';
-  clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.className='', 3200);
-}
+function toast(msg,warn=false){const el=document.getElementById('toast');document.getElementById('toastMsg').textContent=msg;el.className=warn?'show warn':'show';clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.className='',3200);}
 </script>
 </body>
 </html>
