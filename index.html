@@ -5,6 +5,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>🌿 Camera Trap — Registro Inteligente</title>
+<meta name="theme-color" content="#2d6a4f">
+<meta name="description" content="Registro de fauna em campo, off-line, com IA para reconhecer espécies, coleta de amostras e mapa.">
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Camera Trap">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='38' fill='%232d6a4f'/%3E%3Ctext x='96' y='130' font-size='110' text-anchor='middle'%3E%F0%9F%8C%BF%3C/text%3E%3C/svg%3E">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -48,6 +55,8 @@ header h1{font-size:1.1rem;font-weight:700;}
 .user-name{font-size:.78rem;font-weight:600;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .sync-dot{width:8px;height:8px;border-radius:50%;background:#69db7c;margin-left:2px;}
 .sync-dot.offline{background:#ffa94d;}
+.net-badge{font-size:.72rem;padding:4px 9px;border-radius:20px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);white-space:nowrap;}
+.net-badge.off{background:rgba(231,111,81,.7);border-color:transparent;}
 .api-status{font-size:.75rem;padding:4px 10px;border-radius:20px;cursor:pointer;border:1.5px solid rgba(255,255,255,.4);transition:all .2s;background:rgba(255,255,255,.1);}
 .api-status.missing{background:rgba(231,111,81,.6);border-color:transparent;animation:pulse 2s infinite;}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
@@ -244,12 +253,14 @@ td i{font-style:italic;color:#555;}
     <span class="user-name" id="userName">Usuário</span>
     <div class="sync-dot" id="syncDot"></div>
   </div>
+  <span class="net-badge" id="netBadge" title="">🟢 On-line</span>
   <button class="api-status" id="apiStatusBtn" onclick="showTab('config')">⚙️ IA</button>
 </header>
 
 <!-- ══════════════ TABS ══════════════ -->
 <div class="tabs">
   <div class="tab active" onclick="showTab('analise')">🤖 IA <span class="badge" id="badgeFila">0</span></div>
+  <div class="tab" onclick="showTab('campo')">📝 Campo <span class="badge" id="badgeCampo">0</span></div>
   <div class="tab" onclick="showTab('mapa')">🗺 Mapa <span class="badge" id="badgePontos">0</span></div>
   <div class="tab" onclick="showTab('gestao')">🔄 Câmeras <span class="badge" id="badgeGestao">0</span></div>
   <div class="tab" onclick="showTab('tabela')">📋 Tabela <span class="badge" id="badgeTabela">0</span></div>
@@ -382,6 +393,143 @@ td i{font-style:italic;color:#555;}
             <button class="btn btn-secondary" style="flex:1" onclick="proximoItem()">Próximo ➡</button>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ ABA: CAMPO (EpiCollect-style) ══════════════ -->
+<div id="tab-campo" class="page">
+  <div class="gestao-grid">
+    <!-- Formulário de coleta -->
+    <div class="card">
+      <div class="card-header">📝 Registro de Campo (off-line)</div>
+      <div class="card-body">
+        <div class="info-box" style="margin-bottom:12px">
+          Preencha em campo, mesmo <b>sem internet</b>. Os dados ficam salvos no aparelho e podem ser baixados depois na aba 📋 Tabela e vistos no 🗺 Mapa.
+        </div>
+
+        <!-- LOCALIZAÇÃO -->
+        <div class="form-section">
+          <label>📍 Localização</label>
+          <div class="gps-row">
+            <input type="number" id="c_lat" placeholder="Latitude" step="0.000001">
+            <input type="number" id="c_lng" placeholder="Longitude" step="0.000001">
+          </div>
+          <button class="btn btn-gps btn-sm btn-full" style="margin-top:7px" onclick="capturarGPS('c_lat','c_lng',null,'c_gpsStatus')">
+            📡 Encontrar minha localização
+          </button>
+          <div id="c_gpsStatus" style="font-size:.76rem;margin-top:5px;color:var(--verde);display:none"></div>
+        </div>
+
+        <!-- DATA / HORA -->
+        <div class="form-row" style="margin-bottom:11px">
+          <div class="form-section" style="margin-bottom:0">
+            <label>📅 Data <span style="font-weight:normal;color:#aaa">(auto/manual)</span></label>
+            <input type="date" id="c_data">
+          </div>
+          <div class="form-section" style="margin-bottom:0">
+            <label>⏰ Hora <span style="font-weight:normal;color:#aaa">(auto/manual)</span></label>
+            <input type="time" id="c_hora">
+          </div>
+        </div>
+        <div class="btn-group" style="margin-top:0;margin-bottom:11px">
+          <button class="btn btn-outline btn-sm" onclick="agoraCampo()">🕒 Usar data e hora atuais</button>
+        </div>
+
+        <!-- ESPÉCIE -->
+        <div class="form-section">
+          <label>🦜 Espécie</label>
+          <div class="autocomplete-wrap">
+            <input type="text" id="c_especie" placeholder="ex: Onça-pintada" autocomplete="off" oninput="cBuscaEspecie(this.value)">
+            <div class="autocomplete-list" id="cAutocompleteList"></div>
+          </div>
+        </div>
+        <div class="form-section">
+          <label>🔬 Nome Científico</label>
+          <input type="text" id="c_cientifico" style="font-style:italic" placeholder="preenchido pela espécie">
+        </div>
+
+        <!-- INDIVÍDUO -->
+        <div class="form-section">
+          <label>👁 Indivíduo <span style="font-weight:normal;color:#aaa">(quando possível identificar)</span></label>
+          <input type="text" id="c_individuo" placeholder="ex: macho adulto com colar, indivíduo nº 3...">
+        </div>
+
+        <!-- TIPO DE REGISTRO -->
+        <div class="form-section">
+          <label>🔎 Tipo de Registro</label>
+          <select id="c_tipo" onchange="toggleCampoTipo()">
+            <option value="">— selecione —</option>
+            <option value="fezes">💩 Fezes</option>
+            <option value="rastro">🐾 Rastro / Pegada</option>
+            <option value="outro">✳️ Outro</option>
+          </select>
+        </div>
+
+        <!-- FEZES -->
+        <div id="c_fezesWrap" style="display:none;background:var(--verde-light);border:1px solid var(--verde-bg);border-radius:8px;padding:11px;margin-bottom:11px">
+          <div class="form-section">
+            <label>🕑 Estado das fezes</label>
+            <select id="c_estado">
+              <option value="">—</option>
+              <option value="fresco">🟢 Fresco</option>
+              <option value="medio">🟡 Médio</option>
+              <option value="antigo">🔴 Antigo</option>
+            </select>
+          </div>
+          <div class="form-section">
+            <label>🧪 Foi coletado?</label>
+            <select id="c_coletado" onchange="toggleCampoColeta()">
+              <option value="nao">Não</option>
+              <option value="sim">Sim</option>
+            </select>
+          </div>
+          <div id="c_amostrasWrap" style="display:none">
+            <div class="form-section" style="margin-bottom:6px">
+              <label>🔢 Quantas amostras coletadas?</label>
+              <input type="number" id="c_qtd_amostras" min="1" value="1" oninput="previewAmostras()">
+            </div>
+            <div id="c_amostrasPreview" style="font-size:.78rem;color:var(--verde)"></div>
+            <div style="font-size:.72rem;color:#888;margin-top:3px">Um ID único será gerado para cada amostra ao salvar.</div>
+          </div>
+        </div>
+
+        <!-- OUTRO -->
+        <div id="c_outroWrap" class="form-section" style="display:none">
+          <label>✳️ Descreva o registro</label>
+          <textarea id="c_descricao" rows="3" placeholder="descreva o que foi observado..."></textarea>
+        </div>
+
+        <!-- OBSERVADOR / OBS -->
+        <div class="form-section">
+          <label>👤 Observador</label>
+          <input type="text" id="c_observador" list="observadoresList3">
+          <datalist id="observadoresList3"></datalist>
+        </div>
+        <div class="form-section" style="margin-bottom:6px">
+          <label>📝 Observações gerais</label>
+          <textarea id="c_obs" rows="2" placeholder="notas adicionais..."></textarea>
+        </div>
+
+        <div class="btn-group">
+          <button class="btn btn-primary btn-full" onclick="salvarCampo()">✅ Salvar Registro de Campo</button>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-outline btn-full" onclick="limparCampo()">🗑 Limpar formulário</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lista de registros de campo -->
+    <div class="card">
+      <div class="card-header">📜 Registros de Campo
+        <div style="margin-left:auto;display:flex;gap:7px">
+          <button class="btn btn-sm" style="background:white;color:var(--verde)" onclick="exportarCampoCSV()">📥 CSV</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div id="campoList" style="font-size:.82rem;color:#aaa;font-style:italic">Nenhum registro de campo ainda.</div>
       </div>
     </div>
   </div>
@@ -558,6 +706,11 @@ td i{font-style:italic;color:#555;}
         <table><thead><tr><th>#</th><th>Data</th><th>Hora</th><th>Câmera</th><th>Lat</th><th>Lng</th><th>Espécie</th><th>Nome Científico</th><th>Nº</th><th>Sexo</th><th>Idade</th><th>Comportamento</th><th>IA</th><th>Arquivo</th><th>Obs</th><th></th></tr></thead>
         <tbody id="tabelaBody"></tbody></table>
       </div>
+      <h3 style="font-size:.82rem;color:var(--verde);margin-bottom:7px;font-weight:700">📝 REGISTROS DE CAMPO</h3>
+      <div class="table-wrap" style="margin-bottom:18px">
+        <table><thead><tr><th>#</th><th>Data</th><th>Hora</th><th>Latitude</th><th>Longitude</th><th>Espécie</th><th>Nome Científico</th><th>Indivíduo</th><th>Tipo</th><th>Estado</th><th>Coletado</th><th>Nº Amostras</th><th>IDs das Amostras</th><th>Descrição</th><th>Observador</th><th>Obs</th><th></th></tr></thead>
+        <tbody id="campoBody"></tbody></table>
+      </div>
       <h3 style="font-size:.82rem;color:var(--verde);margin-bottom:7px;font-weight:700">🗺 PONTOS DE CÂMERA</h3>
       <div class="table-wrap" style="margin-bottom:18px">
         <table><thead><tr><th>#</th><th>Nome</th><th>Latitude</th><th>Longitude</th><th>Altitude</th><th>Bioma</th><th>Status</th><th>Notas</th><th></th></tr></thead>
@@ -722,6 +875,7 @@ const ESPECIES=[
 // ═══════════════════════════════════════════
 let registros=[];
 let gestaoEventos=[];
+let campoRegistros=[]; // registros de campo estilo EpiCollect (fezes/rastro/outro + amostras)
 let pontos=[]; // {id, nome, lat, lng, alt, bioma, status, notas}
 let fileQueue=[];
 let selectedIdx=-1;
@@ -805,8 +959,8 @@ function menuUsuario() {
   if (confirm(`Logado como: ${currentUser.email}\n\nDeseja sair?`)) {
     auth.signOut();
     document.getElementById('loginOverlay').style.display='flex';
-    registros=[]; gestaoEventos=[]; pontos=[];
-    renderTabela(); renderGestaoTabela(); renderPontos();
+    registros=[]; gestaoEventos=[]; pontos=[]; campoRegistros=[];
+    renderTabela(); renderGestaoTabela(); renderPontos(); renderCampo();
     atualizarBadges();
   }
 }
@@ -818,15 +972,17 @@ async function carregarDadosFirestore() {
   if (!db||!currentUser) return;
   try {
     const uid=currentUser.uid;
-    const [rSnap,gSnap,pSnap] = await Promise.all([
+    const [rSnap,gSnap,pSnap,cSnap] = await Promise.all([
       db.collection(`users/${uid}/registros`).orderBy('data','asc').get(),
       db.collection(`users/${uid}/gestao`).orderBy('data','asc').get(),
       db.collection(`users/${uid}/pontos`).get(),
+      db.collection(`users/${uid}/campo`).orderBy('data','asc').get(),
     ]);
     registros = rSnap.docs.map(d=>({id:d.id,...d.data()}));
     gestaoEventos = gSnap.docs.map(d=>({id:d.id,...d.data()}));
     pontos = pSnap.docs.map(d=>({id:d.id,...d.data()}));
-    renderTabela(); renderGestaoTabela(); renderPontos(); atualizarBadges();
+    campoRegistros = cSnap.docs.map(d=>({id:d.id,...d.data()}));
+    renderTabela(); renderGestaoTabela(); renderPontos(); renderCampo(); atualizarBadges();
     atualizarDataLists(); atualizarSelectCameras();
     renderMapa();
     toast('☁️ Dados carregados da nuvem');
@@ -869,7 +1025,8 @@ function carregarLocal() {
   registros = JSON.parse(localStorage.getItem('ct_registros')||'[]');
   gestaoEventos = JSON.parse(localStorage.getItem('ct_gestao')||'[]');
   pontos = JSON.parse(localStorage.getItem('ct_pontos')||'[]');
-  renderTabela(); renderGestaoTabela(); renderPontos(); atualizarBadges();
+  campoRegistros = JSON.parse(localStorage.getItem('ct_campo')||'[]');
+  renderTabela(); renderGestaoTabela(); renderPontos(); renderCampo(); atualizarBadges();
   atualizarDataLists(); atualizarSelectCameras();
   renderMapa();
 }
@@ -879,6 +1036,7 @@ function salvarLocal() {
   localStorage.setItem('ct_registros',JSON.stringify(registros));
   localStorage.setItem('ct_gestao',JSON.stringify(gestaoEventos));
   localStorage.setItem('ct_pontos',JSON.stringify(pontos));
+  localStorage.setItem('ct_campo',JSON.stringify(campoRegistros));
 }
 
 // ═══════════════════════════════════════════
@@ -902,6 +1060,14 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('f_data').value=new Date().toISOString().split('T')[0];
   document.getElementById('g_data').value=new Date().toISOString().split('T')[0];
 
+  // Campo: data e hora atuais por padrão + observador padrão
+  agoraCampo();
+  const prefsC=JSON.parse(localStorage.getItem('ct_prefs')||'{}');
+  if(prefsC.observador) document.getElementById('c_observador').value=prefsC.observador;
+
+  // Status de rede (on-line / off-line)
+  atualizarStatusRede();
+
   // Inicializar mapa
   setTimeout(inicializarMapa, 300);
 });
@@ -913,7 +1079,7 @@ function showTab(name) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
-  const tabs=['analise','mapa','gestao','tabela','config'];
+  const tabs=['analise','campo','mapa','gestao','tabela','config'];
   document.querySelectorAll('.tab')[tabs.indexOf(name)]?.classList.add('active');
   if(name==='mapa') setTimeout(()=>{if(mapa)mapa.invalidateSize();},100);
 }
@@ -924,6 +1090,7 @@ function showTab(name) {
 function inicializarMapa() {
   const el = document.getElementById('mapaContainer');
   if (!el||mapa) return;
+  if (typeof L==='undefined'){ el.innerHTML='<div style="padding:18px;color:#888;font-size:.85rem">🗺 O mapa precisa de internet na primeira vez para carregar. Reconecte e recarregue.</div>'; return; }
   mapa = L.map('mapaContainer').setView([-15.7801,-47.9292], 4);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
     attribution:'© <a href="https://openstreetmap.org">OpenStreetMap</a>',maxZoom:18
@@ -935,21 +1102,32 @@ function renderMapa() {
   if (!mapa) return;
   mapaMarkers.forEach(m=>m.remove());
   mapaMarkers=[];
-  if (!pontos.length) {
-    document.getElementById('mapaInfo').textContent='Nenhum ponto cadastrado';
+  const ativos = pontos.filter(p=>p.lat&&p.lng);
+  const campoComGps = campoRegistros.filter(r=>r.lat!=null&&r.lng!=null);
+  if (!ativos.length && !campoComGps.length) {
+    document.getElementById('mapaInfo').textContent='Nenhuma localização cadastrada';
     return;
   }
-  const ativos = pontos.filter(p=>p.lat&&p.lng);
-  document.getElementById('mapaInfo').textContent=`${ativos.length} ponto(s) com GPS`;
+  document.getElementById('mapaInfo').textContent=`${ativos.length} câmera(s) · ${campoComGps.length} registro(s) de campo`;
   const bounds=[];
+  // Pontos de câmera
   ativos.forEach(p=>{
     const cor = p.status==='ativo'?'#2d6a4f':p.status==='manutencao'?'#f4a261':'#e76f51';
     const icon = L.divIcon({className:'',html:`<div style="width:14px;height:14px;border-radius:50%;background:${cor};border:2.5px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,iconSize:[14,14],iconAnchor:[7,7]});
     const regCount = registros.filter(r=>r.camera===p.nome).length;
     const marker = L.marker([p.lat,p.lng],{icon}).addTo(mapa)
-      .bindPopup(`<b>${p.nome}</b><br>${p.bioma||'—'}<br>📍 ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}<br>${p.alt?`⛰ ${p.alt}m<br>`:''}🦜 ${regCount} registros<br><span style="font-size:.75rem;color:${cor}">${p.status||'ativo'}</span>`);
+      .bindPopup(`<b>📷 ${p.nome}</b><br>${p.bioma||'—'}<br>📍 ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}<br>${p.alt?`⛰ ${p.alt}m<br>`:''}🦜 ${regCount} registros<br><span style="font-size:.75rem;color:${cor}">${p.status||'ativo'}</span>`);
     mapaMarkers.push(marker);
     bounds.push([p.lat,p.lng]);
+  });
+  // Registros de campo
+  campoComGps.forEach(r=>{
+    const icon = L.divIcon({className:'',html:`<div style="width:16px;height:16px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#7c3aed;border:2.5px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,iconSize:[16,16],iconAnchor:[8,16]});
+    const amostras=r.sample_ids&&r.sample_ids.length?`<br>🧪 ${r.sample_ids.join(', ')}`:'';
+    const marker = L.marker([r.lat,r.lng],{icon}).addTo(mapa)
+      .bindPopup(`<b>📝 ${r.nome_popular}</b><br><i>${r.nome_cientifico||''}</i><br>${tipoCampoLabel(r.tipo)}${r.tipo==='fezes'?' · '+estadoLabel(r.estado):''}<br>📅 ${fmtDate(r.data)}${r.hora?' '+r.hora:''}<br>📍 ${r.lat.toFixed(5)}, ${r.lng.toFixed(5)}${amostras}`);
+    mapaMarkers.push(marker);
+    bounds.push([r.lat,r.lng]);
   });
   if (bounds.length>0) mapa.fitBounds(bounds,{padding:[30,30],maxZoom:14});
 }
@@ -1098,13 +1276,23 @@ function atualizarSelectCameras() {
 // ═══════════════════════════════════════════
 // FILA DE ARQUIVOS
 // ═══════════════════════════════════════════
-function adicionarArquivos(files) {
+async function adicionarArquivos(files) {
   const arr=Array.from(files).filter(f=>f.type.startsWith('image/')||f.type.startsWith('video/'));
   if(!arr.length){toast('Nenhum arquivo de imagem ou vídeo.',true);return;}
-  arr.forEach(file=>{
+  for(const file of arr){
     const meta=extrairMetadados(file.name);
+    // EXIF da imagem tem prioridade sobre o nome do arquivo (data/hora/coordenadas reais)
+    if(file.type.startsWith('image/')){
+      const ex=await lerExif(file);
+      if(ex){
+        if(ex.data){meta.data=ex.data;const[y,m,d]=ex.data.split('-');meta.dataFmt=`${d}/${m}/${y}`;}
+        if(ex.hora) meta.hora=ex.hora;
+        if(ex.lat!=null) meta.lat=ex.lat;
+        if(ex.lng!=null) meta.lng=ex.lng;
+      }
+    }
     fileQueue.push({file,url:URL.createObjectURL(file),meta,status:'waiting',iaResult:null,idx:fileQueue.length});
-  });
+  }
   document.getElementById('emptyQueue').style.display='none';
   renderQueue(); atualizarBadges();
   const first=fileQueue.find(q=>q.status==='waiting');
@@ -1159,6 +1347,13 @@ function selecionarItem(idx) {
     const match=[...sel.options].find(o=>o.value.toUpperCase()===m.camera.toUpperCase());
     if(match) { sel.value=match.value; preencherCoordsDaCamera(); }
   }
+  // Coordenadas extraídas da própria imagem (EXIF/IA), quando não houver câmera com GPS
+  if((m.lat!=null&&m.lng!=null) && !document.getElementById('coordsDisplay').classList.contains('show')){
+    document.getElementById('coordsLat').textContent=`Lat: ${m.lat.toFixed(5)}`;
+    document.getElementById('coordsLng').textContent=`Lng: ${m.lng.toFixed(5)}`;
+    document.getElementById('coordsAlt').textContent='(da imagem)';
+    document.getElementById('coordsDisplay').classList.add('show');
+  }
   const prefs=JSON.parse(localStorage.getItem('ct_prefs')||'{}');
   if(prefs.observador) document.getElementById('f_observador').value=prefs.observador;
   const prev=document.getElementById('formPreview');
@@ -1168,6 +1363,16 @@ function selecionarItem(idx) {
   else{vid.src=item.url;vid.style.display='block';img.style.display='none';}
   if(item.iaResult&&item.status!=='error') preencherFormComIA(item.iaResult);
   document.getElementById('btnAnalisarItem').disabled=false;
+}
+
+// Mescla data/hora/coordenadas que a IA leu na imagem (sem sobrescrever EXIF já existente)
+function mergeIAmeta(item){
+  const r=item.iaResult; if(!r) return;
+  const m=item.meta;
+  if(!m.data && r.date && /^\d{4}-\d{2}-\d{2}$/.test(r.date)){m.data=r.date;const[y,mo,d]=r.date.split('-');m.dataFmt=`${d}/${mo}/${y}`;}
+  if(!m.hora && r.time && /^\d{2}:\d{2}/.test(r.time)) m.hora=String(r.time).slice(0,5);
+  if(m.lat==null && typeof r.latitude==='number' && isFinite(r.latitude)) m.lat=+r.latitude.toFixed(6);
+  if(m.lng==null && typeof r.longitude==='number' && isFinite(r.longitude)) m.lng=+r.longitude.toFixed(6);
 }
 
 function preencherFormComIA(r) {
@@ -1213,6 +1418,7 @@ function limparFila() {
 async function analisarItemAtual() {
   const idx=parseInt(document.getElementById('f_currentIdx').value);
   if(isNaN(idx)||!fileQueue[idx]){toast('Selecione um item primeiro.',true);return;}
+  if(!navigator.onLine){toast('📴 Sem internet — a IA precisa de conexão. Preencha manualmente e salve.',true);return;}
   const apiKey=localStorage.getItem('ct_apikey');
   if(!apiKey){toast('Configure a API key em ⚙️ Config',true);showTab('config');return;}
   const btn=document.getElementById('btnAnalisarItem');
@@ -1222,13 +1428,15 @@ async function analisarItemAtual() {
     const imgData=await fileParaBase64(fileQueue[idx]);
     const result=await chamarGemini(imgData,apiKey);
     fileQueue[idx].iaResult=result; fileQueue[idx].status='done';
-    preencherFormComIA(result); renderQueue();
+    mergeIAmeta(fileQueue[idx]);
+    selecionarItem(idx); renderQueue();
     toast(`✅ ${result.species_popular} (${result.confidence})`);
   }catch(e){fileQueue[idx].status='error'; fileQueue[idx].iaResult={error:e.message}; renderQueue(); toast('⚠️ '+e.message,true);}
   btn.disabled=false; btn.textContent='🤖 Analisar novamente';
 }
 
 async function analisarTodos() {
+  if(!navigator.onLine){toast('📴 Sem internet — a IA precisa de conexão.',true);return;}
   const apiKey=localStorage.getItem('ct_apikey');
   if(!apiKey){toast('Configure a API key em ⚙️ Config',true);showTab('config');return;}
   const pend=fileQueue.filter(q=>q.status==='waiting'||q.status==='error');
@@ -1242,7 +1450,7 @@ async function analisarTodos() {
     document.getElementById('batchStatus').textContent='Analisando: '+item.file.name;
     document.getElementById('batchCount').textContent=`${i+1} de ${pend.length}`;
     item.status='analyzing'; renderQueue();
-    try{const d=await fileParaBase64(item);const r=await chamarGemini(d,apiKey);item.iaResult=r;item.status='done';}
+    try{const d=await fileParaBase64(item);const r=await chamarGemini(d,apiKey);item.iaResult=r;item.status='done';mergeIAmeta(item);}
     catch(e){item.status='error';item.iaResult={error:e.message};}
     renderQueue();
     await new Promise(r=>setTimeout(r,300));
@@ -1307,8 +1515,10 @@ async function chamarGemini(imgData,apiKey) {
   const biomaMap={mata_atlantica:'Mata Atlântica',cerrado:'Cerrado',pantanal:'Pantanal',amazonia:'Amazônia',caatinga:'Caatinga',pampa:'Pampa gaúcho',brasil_geral:'Brasil'};
   const prompt=`Você é um especialista em fauna selvagem do ${biomaMap[bioma]||'Brasil'}.
 Analise esta imagem de câmera trap e identifique a espécie animal presente.
+Leia também QUALQUER tarja/legenda de informação na imagem (geralmente na borda inferior ou superior) e extraia data, hora e coordenadas geográficas, se aparecerem.
 Retorne SOMENTE um JSON válido, sem texto adicional ou markdown:
-{"species_popular":"nome popular em português","species_scientific":"Gênero espécie","count":<número inteiro>,"sex":"Macho"|"Fêmea"|"Indeterminado"|null,"age":"Adulto"|"Jovem"|"Filhote"|"Indeterminado"|null,"behavior":"comportamento observado","confidence":"alta"|"média"|"baixa","notes":"observação sobre qualidade ou identificação (máx 80 chars)"}
+{"species_popular":"nome popular em português","species_scientific":"Gênero espécie","count":<número inteiro>,"sex":"Macho"|"Fêmea"|"Indeterminado"|null,"age":"Adulto"|"Jovem"|"Filhote"|"Indeterminado"|null,"behavior":"comportamento observado","confidence":"alta"|"média"|"baixa","notes":"observação sobre qualidade ou identificação (máx 80 chars)","date":"YYYY-MM-DD ou null se não visível","time":"HH:MM ou null se não visível","latitude":<número decimal ou null>,"longitude":<número decimal ou null>}
+Para latitude/longitude use graus decimais (negativo para Sul/Oeste). Se a informação não estiver visível na imagem, use null.
 Se não houver animal: species_popular="Sem animal visível",species_scientific="N/A",count=0,confidence="alta".`;
   const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${apiKey}`,{
     method:'POST',
@@ -1332,11 +1542,13 @@ async function salvarRegistroAtual() {
   const data=document.getElementById('f_data').value;
   if(!especie||!camera||!data){toast('⚠️ Preencha Câmera, Data e Espécie',true);return;}
   const ponto=pontos.find(p=>p.nome===camera);
+  const idxAtual=parseInt(document.getElementById('f_currentIdx').value);
+  const metaAtual=(!isNaN(idxAtual)&&fileQueue[idxAtual])?fileQueue[idxAtual].meta:{};
   const reg={
     id:Date.now().toString(),
     data, hora:document.getElementById('f_hora').value,
     camera, ponto_id:ponto?.id||'',
-    lat:ponto?.lat||null, lng:ponto?.lng||null,
+    lat:(ponto?.lat ?? metaAtual.lat) ?? null, lng:(ponto?.lng ?? metaAtual.lng) ?? null,
     nome_popular:especie,
     nome_cientifico:document.getElementById('f_nome_cientifico').value.trim(),
     individuos:document.getElementById('f_individuos').value||1,
@@ -1359,6 +1571,184 @@ async function salvarRegistroAtual() {
   document.getElementById('iaBanner').style.display='none';
   const prefs=JSON.parse(localStorage.getItem('ct_prefs')||'{}');
   if(prefs.aposRegistro!=='manter') setTimeout(proximoItem,300);
+}
+
+// ═══════════════════════════════════════════
+// REGISTRO DE CAMPO (estilo EpiCollect)
+// ═══════════════════════════════════════════
+function agoraCampo(){
+  const now=new Date();
+  document.getElementById('c_data').value=now.toISOString().split('T')[0];
+  document.getElementById('c_hora').value=now.toTimeString().slice(0,5);
+}
+
+// Autocomplete de espécie (aba Campo)
+let cAcIdx=-1;
+function cBuscaEspecie(q){
+  const list=document.getElementById('cAutocompleteList');
+  if(q.length<2){list.style.display='none';return;}
+  const matches=ESPECIES.filter(e=>e.p.toLowerCase().includes(q.toLowerCase())||e.s.toLowerCase().includes(q.toLowerCase())).slice(0,8);
+  if(!matches.length){list.style.display='none';return;}
+  list.innerHTML=matches.map(e=>`<div class="autocomplete-item" onclick="cSelEspecie('${e.p.replace(/'/g,"\\'")}','${e.s}')">${e.p}<br><span class="sci">${e.s}</span></div>`).join('');
+  list.style.display='block'; cAcIdx=-1;
+}
+function cSelEspecie(p,s){document.getElementById('c_especie').value=p;document.getElementById('c_cientifico').value=s;document.getElementById('cAutocompleteList').style.display='none';}
+
+function toggleCampoTipo(){
+  const t=document.getElementById('c_tipo').value;
+  document.getElementById('c_fezesWrap').style.display=(t==='fezes')?'block':'none';
+  document.getElementById('c_outroWrap').style.display=(t==='outro')?'block':'none';
+  if(t==='fezes') toggleCampoColeta();
+}
+function toggleCampoColeta(){
+  const col=document.getElementById('c_coletado').value;
+  document.getElementById('c_amostrasWrap').style.display=(col==='sim')?'block':'none';
+  if(col==='sim') previewAmostras();
+}
+function previewAmostras(){
+  const qtd=Math.max(1,parseInt(document.getElementById('c_qtd_amostras').value)||1);
+  const el=document.getElementById('c_amostrasPreview');
+  el.innerHTML=`Serão geradas <b>${qtd}</b> ID(s): `+
+    Array.from({length:qtd},(_,i)=>`<span class="ia-tag">amostra ${i+1}</span>`).join(' ');
+}
+
+// Gera IDs únicos e sequenciais para amostras coletadas
+function gerarIdsAmostras(qtd, dataStr){
+  let seq=parseInt(localStorage.getItem('ct_amostra_seq')||'0');
+  const ymd=(dataStr||new Date().toISOString().split('T')[0]).replace(/-/g,'');
+  const ids=[];
+  for(let i=0;i<qtd;i++){
+    seq++;
+    ids.push(`AM-${ymd}-${String(seq).padStart(4,'0')}`);
+  }
+  localStorage.setItem('ct_amostra_seq',String(seq));
+  return ids;
+}
+
+async function salvarCampo(){
+  const especie=document.getElementById('c_especie').value.trim();
+  const tipo=document.getElementById('c_tipo').value;
+  const data=document.getElementById('c_data').value;
+  if(!data){toast('⚠️ Informe a data (use "Usar data e hora atuais")',true);return;}
+  if(!especie){toast('⚠️ Informe a espécie',true);return;}
+  if(!tipo){toast('⚠️ Selecione o tipo de registro',true);return;}
+
+  let estado='', coletado='nao', qtdAmostras=0, sampleIds=[], descricao='';
+  if(tipo==='fezes'){
+    estado=document.getElementById('c_estado').value;
+    coletado=document.getElementById('c_coletado').value;
+    if(coletado==='sim'){
+      qtdAmostras=Math.max(1,parseInt(document.getElementById('c_qtd_amostras').value)||1);
+      sampleIds=gerarIdsAmostras(qtdAmostras,data);
+    }
+  } else if(tipo==='outro'){
+    descricao=document.getElementById('c_descricao').value.trim();
+    if(!descricao){toast('⚠️ Descreva o registro "outro"',true);return;}
+  }
+
+  const reg={
+    id:Date.now().toString(),
+    data,
+    hora:document.getElementById('c_hora').value,
+    lat:parseFloat(document.getElementById('c_lat').value)||null,
+    lng:parseFloat(document.getElementById('c_lng').value)||null,
+    nome_popular:especie,
+    nome_cientifico:document.getElementById('c_cientifico').value.trim(),
+    individuo:document.getElementById('c_individuo').value.trim(),
+    tipo,
+    estado,
+    coletado,
+    qtd_amostras:qtdAmostras,
+    sample_ids:sampleIds,
+    descricao,
+    observador:document.getElementById('c_observador').value.trim(),
+    obs:document.getElementById('c_obs').value.trim(),
+  };
+  campoRegistros.push(reg);
+  if(currentUser) await salvarFirestore('campo',reg);
+  else salvarLocal();
+  renderCampo(); renderTabela(); atualizarBadges(); atualizarDataLists(); renderMapa();
+  if(sampleIds.length) toast(`💾 Salvo! IDs: ${sampleIds.join(', ')}`);
+  else toast('💾 Registro de campo salvo!');
+  limparCampo();
+}
+
+function tipoCampoLabel(t){return{fezes:'💩 Fezes',rastro:'🐾 Rastro',outro:'✳️ Outro'}[t]||t;}
+function estadoLabel(e){return{fresco:'Fresco',medio:'Médio',antigo:'Antigo'}[e]||e||'—';}
+
+function renderCampo(){
+  // Lista lateral (aba Campo)
+  const el=document.getElementById('campoList');
+  if(el){
+    if(!campoRegistros.length){el.innerHTML='<span style="color:#aaa;font-style:italic">Nenhum registro de campo ainda.</span>';}
+    else el.innerHTML=[...campoRegistros].reverse().map(r=>`
+      <div style="padding:10px;border:1px solid var(--borda);border-radius:8px;margin-bottom:8px;font-size:.81rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+          <b>${r.nome_popular}</b>
+          <span style="background:var(--verde-bg);color:var(--verde);padding:2px 7px;border-radius:10px;font-size:.7rem;font-weight:700">${tipoCampoLabel(r.tipo)}</span>
+        </div>
+        <div style="color:#555">${fmtDate(r.data)}${r.hora?' · '+r.hora:''}${r.individuo?' · '+r.individuo:''}</div>
+        ${r.lat!=null&&r.lng!=null?`<div class="ponto-coords">📍 ${r.lat.toFixed(5)}, ${r.lng.toFixed(5)}</div>`:'<div style="font-size:.72rem;color:#e76f51">⚠️ Sem localização</div>'}
+        ${r.tipo==='fezes'?`<div style="color:#666;font-size:.76rem;margin-top:2px">Estado: ${estadoLabel(r.estado)} · ${r.coletado==='sim'?`Coletado: ${r.qtd_amostras} amostra(s)`:'Não coletado'}</div>`:''}
+        ${r.sample_ids&&r.sample_ids.length?`<div class="ia-tags" style="margin-top:4px">${r.sample_ids.map(id=>`<span class="ia-tag conf-alta">${id}</span>`).join('')}</div>`:''}
+        ${r.descricao?`<div style="color:#666;font-size:.76rem;margin-top:2px">${r.descricao}</div>`:''}
+      </div>`).join('');
+  }
+  // Tabela (aba Tabela)
+  const tbody=document.getElementById('campoBody');
+  if(tbody){
+    tbody.innerHTML=campoRegistros.map((r,i)=>`<tr>
+      <td>${i+1}</td><td>${fmtDate(r.data)}</td><td>${r.hora||'—'}</td>
+      <td style="font-size:.75rem">${r.lat!=null?r.lat.toFixed(6):'—'}</td>
+      <td style="font-size:.75rem">${r.lng!=null?r.lng.toFixed(6):'—'}</td>
+      <td>${r.nome_popular}</td><td><i>${r.nome_cientifico||'—'}</i></td>
+      <td>${r.individuo||'—'}</td><td>${tipoCampoLabel(r.tipo)}</td>
+      <td>${r.tipo==='fezes'?estadoLabel(r.estado):'—'}</td>
+      <td>${r.tipo==='fezes'?(r.coletado==='sim'?'Sim':'Não'):'—'}</td>
+      <td>${r.qtd_amostras||'—'}</td>
+      <td style="font-size:.72rem">${r.sample_ids&&r.sample_ids.length?r.sample_ids.join(', '):'—'}</td>
+      <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis">${r.descricao||'—'}</td>
+      <td>${r.observador||'—'}</td>
+      <td style="max-width:90px;overflow:hidden;text-overflow:ellipsis">${r.obs||'—'}</td>
+      <td><button class="del-btn" onclick="deletarCampo('${r.id}')">✕</button></td>
+    </tr>`).join('')||'<tr><td colspan="17" style="text-align:center;color:#aaa;padding:14px">Nenhum registro de campo</td></tr>';
+  }
+}
+
+async function deletarCampo(id){
+  if(!confirm('Remover este registro de campo?'))return;
+  campoRegistros=campoRegistros.filter(r=>r.id!==id);
+  if(currentUser)await deletarFirestore('campo',id);else salvarLocal();
+  renderCampo();renderTabela();atualizarBadges();renderMapa();
+}
+
+function limparCampo(){
+  ['c_especie','c_cientifico','c_individuo','c_descricao','c_obs','c_qtd_amostras'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('c_qtd_amostras').value=1;
+  document.getElementById('c_tipo').value='';
+  document.getElementById('c_estado').value='';
+  document.getElementById('c_coletado').value='nao';
+  toggleCampoTipo();
+  // mantém data/hora/localização/observador para facilitar registros em sequência
+  const prefs=JSON.parse(localStorage.getItem('ct_prefs')||'{}');
+  if(prefs.observador&&!document.getElementById('c_observador').value) document.getElementById('c_observador').value=prefs.observador;
+}
+
+function exportarCampoCSV(){
+  if(!campoRegistros.length){toast('Nenhum registro de campo.',true);return;}
+  // Uma linha por amostra (registros sem amostra geram 1 linha com ID em branco)
+  let csv='Data,Hora,Latitude,Longitude,Especie,Nome Cientifico,Individuo,Tipo,Estado Fezes,Coletado,Total Amostras,ID Amostra,Descricao,Observador,Obs\n';
+  const linhas=[];
+  campoRegistros.forEach(r=>{
+    const ids=(r.sample_ids&&r.sample_ids.length)?r.sample_ids:[''];
+    ids.forEach(idAmostra=>{
+      linhas.push([r.data,r.hora||'',r.lat??'',r.lng??'',r.nome_popular,r.nome_cientifico||'',r.individuo||'',tipoCampoLabel(r.tipo).replace(/[^\wÀ-ÿ ]/g,'').trim(),r.tipo==='fezes'?estadoLabel(r.estado):'',r.tipo==='fezes'?(r.coletado==='sim'?'Sim':'Nao'):'',r.qtd_amostras||'',idAmostra,r.descricao||'',r.observador||'',r.obs||'']);
+    });
+  });
+  csv+=linhas.map(l=>l.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`registros_campo_${new Date().toISOString().slice(0,10)}.csv`;a.click();
+  toast('📥 CSV de campo exportado!');
 }
 
 // ═══════════════════════════════════════════
@@ -1413,7 +1803,7 @@ function renderTabela() {
     <td style="max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.obs||'—'}</td>
     <td><button class="del-btn" onclick="deletarReg('${r.id}')">✕</button></td>
   </tr>`).join('')||'<tr><td colspan="16" style="text-align:center;color:#aaa;padding:14px">Nenhum registro</td></tr>';
-  document.getElementById('countLabel').textContent=`${registros.length} registros · ${gestaoEventos.length} eventos · ${pontos.length} pontos`;
+  document.getElementById('countLabel').textContent=`${registros.length} registros · ${campoRegistros.length} de campo · ${gestaoEventos.length} eventos · ${pontos.length} pontos`;
 }
 
 function renderGestaoTabela() {
@@ -1430,18 +1820,30 @@ function renderGestaoTabela() {
 
 async function deletarReg(id){if(!confirm('Remover?'))return;registros=registros.filter(r=>r.id!==id);if(currentUser)await deletarFirestore('registros',id);else salvarLocal();renderTabela();atualizarBadges();}
 async function deletarGestao(id){if(!confirm('Remover?'))return;gestaoEventos=gestaoEventos.filter(e=>e.id!==id);if(currentUser)await deletarFirestore('gestao',id);else salvarLocal();renderGestaoTabela();atualizarBadges();}
-function limparTudo(){if(!confirm('Apagar TUDO? Exporte primeiro!'))return;registros=[];gestaoEventos=[];if(!currentUser)salvarLocal();renderTabela();renderGestaoTabela();atualizarBadges();}
+function limparTudo(){if(!confirm('Apagar TUDO? Exporte primeiro!'))return;registros=[];gestaoEventos=[];campoRegistros=[];if(!currentUser)salvarLocal();renderTabela();renderGestaoTabela();renderCampo();atualizarBadges();renderMapa();}
 
 // ═══════════════════════════════════════════
 // EXPORTAÇÃO
 // ═══════════════════════════════════════════
 function exportarExcel(){
-  if(!registros.length&&!gestaoEventos.length&&!pontos.length){toast('Nenhum dado.',true);return;}
+  if(!registros.length&&!gestaoEventos.length&&!pontos.length&&!campoRegistros.length){toast('Nenhum dado.',true);return;}
   const wb=XLSX.utils.book_new();
   const cols1=['Data','Hora','Câmera','Latitude','Longitude','Espécie','Nome Científico','Nº','Sexo','Idade','Comportamento','Confiança IA','Arquivo','Observador','Observações'];
   const rows1=registros.map(r=>[r.data,r.hora||'',r.camera,r.lat||'',r.lng||'',r.nome_popular,r.nome_cientifico||'',r.individuos,r.sexo||'',r.idade||'',r.comportamento||'',r.confianca_ia||'',r.arquivo||'',r.observador||'',r.obs||'']);
   const ws1=XLSX.utils.aoa_to_sheet([cols1,...rows1]);
   XLSX.utils.book_append_sheet(wb,ws1,'Registros Espécies');
+
+  // Registros de campo (estilo EpiCollect)
+  const colsC=['Data','Hora','Latitude','Longitude','Espécie','Nome Científico','Indivíduo','Tipo','Estado Fezes','Coletado','Total Amostras','IDs das Amostras','Descrição','Observador','Observações'];
+  const rowsC=campoRegistros.map(r=>[r.data,r.hora||'',r.lat??'',r.lng??'',r.nome_popular,r.nome_cientifico||'',r.individuo||'',r.tipo,r.tipo==='fezes'?estadoLabel(r.estado):'',r.tipo==='fezes'?(r.coletado==='sim'?'Sim':'Não'):'',r.qtd_amostras||'',(r.sample_ids||[]).join(', '),r.descricao||'',r.observador||'',r.obs||'']);
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([colsC,...rowsC]),'Registros Campo');
+
+  // Amostras coletadas (uma linha por ID)
+  const colsA=['ID Amostra','Data','Hora','Latitude','Longitude','Espécie','Nome Científico','Estado Fezes','Observador'];
+  const rowsA=[];
+  campoRegistros.forEach(r=>{(r.sample_ids||[]).forEach(idA=>{rowsA.push([idA,r.data,r.hora||'',r.lat??'',r.lng??'',r.nome_popular,r.nome_cientifico||'',estadoLabel(r.estado),r.observador||'']);});});
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([colsA,...rowsA]),'Amostras');
+
   const cols2=['Nome','Latitude','Longitude','Altitude','Bioma','Status','Notas'];
   const rows2=pontos.map(p=>[p.nome,p.lat||'',p.lng||'',p.alt||'',p.bioma||'',p.status||'ativo',p.notas||'']);
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([cols2,...rows2]),'Pontos Câmeras');
@@ -1483,7 +1885,7 @@ document.addEventListener('keydown',e=>{
   else if(e.key==='Escape'){l.style.display='none';return;}
   items.forEach((it,i)=>it.classList.toggle('sel',i===acIdx));
 });
-document.addEventListener('click',e=>{if(!e.target.closest('.autocomplete-wrap'))document.getElementById('autocompleteList').style.display='none';});
+document.addEventListener('click',e=>{if(!e.target.closest('.autocomplete-wrap')){document.getElementById('autocompleteList').style.display='none';document.getElementById('cAutocompleteList').style.display='none';}});
 
 // ═══════════════════════════════════════════
 // CONFIG
@@ -1536,8 +1938,55 @@ function carregarPrefs(){
 // ═══════════════════════════════════════════
 // UTILITÁRIOS
 // ═══════════════════════════════════════════
+// Lê EXIF de JPEG: data/hora original e coordenadas GPS (lat/lng).
+async function lerExif(file){
+  try{
+    const buf=await file.arrayBuffer();
+    const view=new DataView(buf);
+    if(view.getUint16(0)!==0xFFD8) return null; // não é JPEG
+    let offset=2, app1=null; const len=view.byteLength;
+    while(offset+4<len){
+      const marker=view.getUint16(offset);
+      if(marker===0xFFE1){app1=offset;break;}
+      if((marker&0xFF00)!==0xFF00) break;
+      offset+=2+view.getUint16(offset+2);
+    }
+    if(app1==null) return null;
+    const start=app1+4;
+    if(view.getUint32(start)!==0x45786966) return null; // "Exif"
+    const tiff=start+6;
+    const little=view.getUint16(tiff)===0x4949;
+    const get16=o=>view.getUint16(o,little);
+    const get32=o=>view.getUint32(o,little);
+    const ifd0=tiff+get32(tiff+4);
+    const readDir=ds=>{const n=get16(ds);const out=[];for(let i=0;i<n;i++){const e=ds+2+i*12;out.push({tag:get16(e),type:get16(e+2),count:get32(e+4),valOff:e+8});}return out;};
+    const ascii=e=>{const off=e.count>4?tiff+get32(e.valOff):e.valOff;let s='';for(let i=0;i<e.count-1;i++)s+=String.fromCharCode(view.getUint8(off+i));return s;};
+    const rationals=e=>{const off=tiff+get32(e.valOff);const a=[];for(let i=0;i<e.count;i++){const d=get32(off+i*8+4);a.push(d?get32(off+i*8)/d:0);}return a;};
+    const res={data:null,hora:null,lat:null,lng:null};
+    let exifIFD=null,gpsIFD=null;
+    for(const e of readDir(ifd0)){
+      if(e.tag===0x8769) exifIFD=tiff+get32(e.valOff);
+      if(e.tag===0x8825) gpsIFD=tiff+get32(e.valOff);
+      if(e.tag===0x0132&&!res.data){const m=ascii(e).match(/(\d{4}):(\d{2}):(\d{2})\s+(\d{2}):(\d{2})/);if(m){res.data=`${m[1]}-${m[2]}-${m[3]}`;res.hora=`${m[4]}:${m[5]}`;}}
+    }
+    if(exifIFD){for(const e of readDir(exifIFD)){if(e.tag===0x9003){const m=ascii(e).match(/(\d{4}):(\d{2}):(\d{2})\s+(\d{2}):(\d{2})/);if(m){res.data=`${m[1]}-${m[2]}-${m[3]}`;res.hora=`${m[4]}:${m[5]}`;}}}}
+    if(gpsIFD){
+      let latRef='N',lngRef='E',latA=null,lngA=null;
+      for(const e of readDir(gpsIFD)){
+        if(e.tag===0x0001) latRef=ascii(e)||'N';
+        if(e.tag===0x0002) latA=rationals(e);
+        if(e.tag===0x0003) lngRef=ascii(e)||'E';
+        if(e.tag===0x0004) lngA=rationals(e);
+      }
+      if(latA&&latA.length===3){let v=latA[0]+latA[1]/60+latA[2]/3600;if(/S/i.test(latRef))v=-v;res.lat=+v.toFixed(6);}
+      if(lngA&&lngA.length===3){let v=lngA[0]+lngA[1]/60+lngA[2]/3600;if(/W/i.test(lngRef))v=-v;res.lng=+v.toFixed(6);}
+    }
+    return res;
+  }catch(e){return null;}
+}
+
 function extrairMetadados(nome){
-  const r={data:null,hora:null,camera:null,dataFmt:null};
+  const r={data:null,hora:null,camera:null,dataFmt:null,lat:null,lng:null};
   const mC=nome.match(/^(CAM\d+|CT\d+|TRAP\d+)/i);if(mC)r.camera=mC[1].toUpperCase();
   let mD=nome.match(/(\d{4})[-_]?(\d{2})[-_]?(\d{2})/);
   if(mD){const[_,y,m,d]=mD;r.data=`${y}-${m}-${d}`;r.dataFmt=`${d}/${m}/${y}`;}
@@ -1546,18 +1995,39 @@ function extrairMetadados(nome){
   return r;
 }
 function atualizarDataLists(){
-  const obs=[...new Set(registros.map(r=>r.observador).filter(Boolean))];
-  ['observadoresList','observadoresList2'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=obs.map(o=>`<option value="${o}">`).join('');});
+  const obs=[...new Set([...registros.map(r=>r.observador),...campoRegistros.map(r=>r.observador)].filter(Boolean))];
+  ['observadoresList','observadoresList2','observadoresList3'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=obs.map(o=>`<option value="${o}">`).join('');});
 }
 function atualizarBadges(){
   document.getElementById('badgeFila').textContent=fileQueue.filter(q=>q.status!=='saved').length;
-  document.getElementById('badgeTabela').textContent=registros.length+gestaoEventos.length;
+  document.getElementById('badgeTabela').textContent=registros.length+gestaoEventos.length+campoRegistros.length;
   document.getElementById('badgeGestao').textContent=gestaoEventos.length;
   document.getElementById('badgePontos').textContent=pontos.length;
+  document.getElementById('badgeCampo').textContent=campoRegistros.length;
 }
 function fmtDate(d){if(!d)return'—';const[y,m,dd]=d.split('-');return`${dd}/${m}/${y}`;}
 let toastTimer;
 function toast(msg,warn=false){const el=document.getElementById('toast');document.getElementById('toastMsg').textContent=msg;el.className=warn?'show warn':'show';clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.className='',3200);}
+
+// ═══════════════════════════════════════════
+// PWA / OFF-LINE
+// ═══════════════════════════════════════════
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js').catch(e=>console.warn('SW falhou:',e));
+  });
+}
+function atualizarStatusRede(){
+  const off=!navigator.onLine;
+  const badge=document.getElementById('netBadge');
+  if(badge){
+    badge.textContent=off?'📴 Off-line':'🟢 On-line';
+    badge.className='net-badge'+(off?' off':'');
+    badge.title=off?'Sem internet — registros são salvos no aparelho e a IA fica indisponível até reconectar.':'Conectado.';
+  }
+}
+window.addEventListener('online',()=>{atualizarStatusRede();toast('🟢 Conexão restabelecida');});
+window.addEventListener('offline',()=>{atualizarStatusRede();toast('📴 Sem internet — você pode continuar registrando off-line',true);});
 </script>
 </body>
 </html>
