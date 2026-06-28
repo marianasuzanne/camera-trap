@@ -261,6 +261,7 @@ td i{font-style:italic;color:#555;}
 <div class="tabs">
   <div class="tab active" onclick="showTab('analise')">🤖 IA <span class="badge" id="badgeFila">0</span></div>
   <div class="tab" onclick="showTab('campo')">📝 Campo <span class="badge" id="badgeCampo">0</span></div>
+  <div class="tab" onclick="showTab('instalacao')">🛠 Instalação <span class="badge" id="badgeInst">0</span></div>
   <div class="tab" onclick="showTab('mapa')">🗺 Mapa <span class="badge" id="badgePontos">0</span></div>
   <div class="tab" onclick="showTab('gestao')">🔄 Câmeras <span class="badge" id="badgeGestao">0</span></div>
   <div class="tab" onclick="showTab('tabela')">📋 Tabela <span class="badge" id="badgeTabela">0</span></div>
@@ -535,6 +536,157 @@ td i{font-style:italic;color:#555;}
   </div>
 </div>
 
+<!-- ══════════════ ABA: INSTALAÇÃO DE CÂMERA ══════════════ -->
+<div id="tab-instalacao" class="page">
+  <div class="gestao-grid">
+    <!-- Formulário -->
+    <div class="card">
+      <div class="card-header">🛠 Instalação / Desinstalação / Manutenção</div>
+      <div class="card-body">
+        <div class="info-box" style="margin-bottom:12px">
+          Registre, mesmo <b>sem internet</b>, quando você instalou, retirou ou fez manutenção em uma câmera trap. Os dados ficam salvos no aparelho e podem ser baixados depois (CSV/Excel).
+        </div>
+
+        <!-- LOCALIZAÇÃO -->
+        <div class="form-section">
+          <label>📍 Localização da câmera</label>
+          <div class="gps-row">
+            <input type="number" id="i_lat" placeholder="Latitude" step="0.000001">
+            <input type="number" id="i_lng" placeholder="Longitude" step="0.000001">
+          </div>
+          <button class="btn btn-gps btn-sm btn-full" style="margin-top:7px" onclick="capturarGPS('i_lat','i_lng',null,'i_gpsStatus')">
+            📡 Encontrar localização agora
+          </button>
+          <div id="i_gpsStatus" style="font-size:.76rem;margin-top:5px;color:var(--verde);display:none"></div>
+        </div>
+
+        <!-- CÂMERA (opcional) -->
+        <div class="form-section">
+          <label>📷 Câmera / Ponto <span style="font-weight:normal;color:#aaa">(opcional)</span></label>
+          <input type="text" id="i_camera" list="camerasListInst" placeholder="ex: CAM01 — Trilha Norte">
+          <datalist id="camerasListInst"></datalist>
+        </div>
+
+        <!-- TIPO -->
+        <div class="form-section">
+          <label>⚙️ O que você fez?</label>
+          <select id="i_tipo" onchange="toggleInstTipo()">
+            <option value="">— selecione —</option>
+            <option value="instalacao">🆕 Instalação</option>
+            <option value="desinstalacao">📤 Desinstalação</option>
+            <option value="manutencao">🔧 Manutenção</option>
+          </select>
+        </div>
+
+        <!-- DATA / HORA -->
+        <div class="form-row" style="margin-bottom:11px">
+          <div class="form-section" style="margin-bottom:0">
+            <label>📅 Data</label>
+            <input type="date" id="i_data">
+          </div>
+          <div class="form-section" style="margin-bottom:0">
+            <label>⏰ Hora</label>
+            <input type="time" id="i_hora">
+          </div>
+        </div>
+        <div class="btn-group" style="margin-top:0;margin-bottom:11px">
+          <button class="btn btn-outline btn-sm" onclick="agoraInstalacao()">🕒 Usar data e hora atuais</button>
+        </div>
+
+        <!-- INSTALAÇÃO -->
+        <div id="i_instWrap" style="display:none;background:var(--verde-light);border:1px solid var(--verde-bg);border-radius:8px;padding:11px;margin-bottom:11px">
+          <div class="form-section">
+            <label>💾 Cartão de memória (GB)</label>
+            <input type="number" id="i_cartao_gb" min="0" placeholder="ex: 32">
+          </div>
+          <div class="form-section" style="margin-bottom:0">
+            <label>🔋 Pilhas</label>
+            <select id="i_pilhas">
+              <option value="">—</option>
+              <option value="novas">Novas</option>
+              <option value="usadas">Usadas</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- DESINSTALAÇÃO -->
+        <div id="i_desWrap" style="display:none;background:var(--verde-light);border:1px solid var(--verde-bg);border-radius:8px;padding:11px;margin-bottom:11px">
+          <div class="form-section" style="margin-bottom:0">
+            <label>❓ Motivo da desinstalação</label>
+            <select id="i_motivo" onchange="toggleMotivoOutro()">
+              <option value="">—</option>
+              <option value="local_ruim">Local ruim</option>
+              <option value="troca_local">Troca de local</option>
+              <option value="roubo">Roubo</option>
+              <option value="outro">Outro</option>
+            </select>
+          </div>
+          <div id="i_motivoOutroWrap" class="form-section" style="display:none;margin-top:11px;margin-bottom:0">
+            <label>✏️ Qual outro motivo?</label>
+            <input type="text" id="i_motivo_outro" placeholder="descreva o motivo">
+          </div>
+        </div>
+
+        <!-- MANUTENÇÃO -->
+        <div id="i_manutWrap" style="display:none;background:var(--verde-light);border:1px solid var(--verde-bg);border-radius:8px;padding:11px;margin-bottom:11px">
+          <div class="form-section">
+            <label>💾 Trocou o cartão?</label>
+            <select id="i_troca_cartao" onchange="toggleTrocaCartao()">
+              <option value="nao">Não</option>
+              <option value="sim">Sim</option>
+            </select>
+          </div>
+          <div id="i_cartaoQualWrap" class="form-section" style="display:none">
+            <label>💾 Qual cartão? (número/GB)</label>
+            <input type="text" id="i_cartao_qual" placeholder="ex: cartão 32GB nº 3">
+          </div>
+          <div class="form-section">
+            <label>🔋 Trocou a pilha?</label>
+            <select id="i_troca_pilha">
+              <option value="nao">Não</option>
+              <option value="sim">Sim</option>
+            </select>
+          </div>
+          <div class="form-section" style="margin-bottom:0">
+            <label>✳️ Outro procedimento <span style="font-weight:normal;color:#aaa">(opcional)</span></label>
+            <textarea id="i_manut_outro" rows="2" placeholder="descreva qual outro procedimento de manutenção foi feito..."></textarea>
+          </div>
+        </div>
+
+        <!-- RESPONSÁVEL / OBS -->
+        <div class="form-section">
+          <label>👤 Responsável</label>
+          <input type="text" id="i_responsavel" list="observadoresList4">
+          <datalist id="observadoresList4"></datalist>
+        </div>
+        <div class="form-section" style="margin-bottom:6px">
+          <label>📝 Observações</label>
+          <textarea id="i_obs" rows="2" placeholder="notas adicionais..."></textarea>
+        </div>
+
+        <div class="btn-group">
+          <button class="btn btn-primary btn-full" onclick="salvarInstalacao()">✅ Salvar Registro</button>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-outline btn-full" onclick="limparInstalacao()">🗑 Limpar formulário</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lista -->
+    <div class="card">
+      <div class="card-header">📜 Registros de Câmera
+        <div style="margin-left:auto;display:flex;gap:7px">
+          <button class="btn btn-sm" style="background:white;color:var(--verde)" onclick="exportarInstalacoesCSV()">📥 CSV</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div id="instList" style="font-size:.82rem;color:#aaa;font-style:italic">Nenhum registro ainda.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════════ ABA: MAPA ══════════════ -->
 <div id="tab-mapa" class="page">
   <div class="mapa-grid">
@@ -711,6 +863,11 @@ td i{font-style:italic;color:#555;}
         <table><thead><tr><th>#</th><th>Data</th><th>Hora</th><th>Latitude</th><th>Longitude</th><th>Espécie</th><th>Nome Científico</th><th>Indivíduo</th><th>Tipo</th><th>Estado</th><th>Coletado</th><th>Nº Amostras</th><th>IDs das Amostras</th><th>Descrição</th><th>Observador</th><th>Obs</th><th></th></tr></thead>
         <tbody id="campoBody"></tbody></table>
       </div>
+      <h3 style="font-size:.82rem;color:var(--verde);margin-bottom:7px;font-weight:700">🛠 INSTALAÇÃO / MANUTENÇÃO DE CÂMERAS</h3>
+      <div class="table-wrap" style="margin-bottom:18px">
+        <table><thead><tr><th>#</th><th>Data</th><th>Hora</th><th>Latitude</th><th>Longitude</th><th>Câmera</th><th>Tipo</th><th>Cartão (GB)</th><th>Pilhas</th><th>Motivo</th><th>Troca Cartão</th><th>Qual Cartão</th><th>Troca Pilha</th><th>Outro (manut.)</th><th>Responsável</th><th>Obs</th><th></th></tr></thead>
+        <tbody id="instBody"></tbody></table>
+      </div>
       <h3 style="font-size:.82rem;color:var(--verde);margin-bottom:7px;font-weight:700">🗺 PONTOS DE CÂMERA</h3>
       <div class="table-wrap" style="margin-bottom:18px">
         <table><thead><tr><th>#</th><th>Nome</th><th>Latitude</th><th>Longitude</th><th>Altitude</th><th>Bioma</th><th>Status</th><th>Notas</th><th></th></tr></thead>
@@ -876,6 +1033,7 @@ const ESPECIES=[
 let registros=[];
 let gestaoEventos=[];
 let campoRegistros=[]; // registros de campo estilo EpiCollect (fezes/rastro/outro + amostras)
+let instalacoes=[]; // instalação/desinstalação/manutenção de câmeras trap
 let pontos=[]; // {id, nome, lat, lng, alt, bioma, status, notas}
 let fileQueue=[];
 let selectedIdx=-1;
@@ -959,8 +1117,8 @@ function menuUsuario() {
   if (confirm(`Logado como: ${currentUser.email}\n\nDeseja sair?`)) {
     auth.signOut();
     document.getElementById('loginOverlay').style.display='flex';
-    registros=[]; gestaoEventos=[]; pontos=[]; campoRegistros=[];
-    renderTabela(); renderGestaoTabela(); renderPontos(); renderCampo();
+    registros=[]; gestaoEventos=[]; pontos=[]; campoRegistros=[]; instalacoes=[];
+    renderTabela(); renderGestaoTabela(); renderPontos(); renderCampo(); renderInstalacoes();
     atualizarBadges();
   }
 }
@@ -972,17 +1130,19 @@ async function carregarDadosFirestore() {
   if (!db||!currentUser) return;
   try {
     const uid=currentUser.uid;
-    const [rSnap,gSnap,pSnap,cSnap] = await Promise.all([
+    const [rSnap,gSnap,pSnap,cSnap,iSnap] = await Promise.all([
       db.collection(`users/${uid}/registros`).orderBy('data','asc').get(),
       db.collection(`users/${uid}/gestao`).orderBy('data','asc').get(),
       db.collection(`users/${uid}/pontos`).get(),
       db.collection(`users/${uid}/campo`).orderBy('data','asc').get(),
+      db.collection(`users/${uid}/instalacoes`).orderBy('data','asc').get(),
     ]);
     registros = rSnap.docs.map(d=>({id:d.id,...d.data()}));
     gestaoEventos = gSnap.docs.map(d=>({id:d.id,...d.data()}));
     pontos = pSnap.docs.map(d=>({id:d.id,...d.data()}));
     campoRegistros = cSnap.docs.map(d=>({id:d.id,...d.data()}));
-    renderTabela(); renderGestaoTabela(); renderPontos(); renderCampo(); atualizarBadges();
+    instalacoes = iSnap.docs.map(d=>({id:d.id,...d.data()}));
+    renderTabela(); renderGestaoTabela(); renderPontos(); renderCampo(); renderInstalacoes(); atualizarBadges();
     atualizarDataLists(); atualizarSelectCameras();
     renderMapa();
     toast('☁️ Dados carregados da nuvem');
@@ -1026,7 +1186,8 @@ function carregarLocal() {
   gestaoEventos = JSON.parse(localStorage.getItem('ct_gestao')||'[]');
   pontos = JSON.parse(localStorage.getItem('ct_pontos')||'[]');
   campoRegistros = JSON.parse(localStorage.getItem('ct_campo')||'[]');
-  renderTabela(); renderGestaoTabela(); renderPontos(); renderCampo(); atualizarBadges();
+  instalacoes = JSON.parse(localStorage.getItem('ct_instalacoes')||'[]');
+  renderTabela(); renderGestaoTabela(); renderPontos(); renderCampo(); renderInstalacoes(); atualizarBadges();
   atualizarDataLists(); atualizarSelectCameras();
   renderMapa();
 }
@@ -1037,6 +1198,7 @@ function salvarLocal() {
   localStorage.setItem('ct_gestao',JSON.stringify(gestaoEventos));
   localStorage.setItem('ct_pontos',JSON.stringify(pontos));
   localStorage.setItem('ct_campo',JSON.stringify(campoRegistros));
+  localStorage.setItem('ct_instalacoes',JSON.stringify(instalacoes));
 }
 
 // ═══════════════════════════════════════════
@@ -1060,10 +1222,14 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('f_data').value=new Date().toISOString().split('T')[0];
   document.getElementById('g_data').value=new Date().toISOString().split('T')[0];
 
-  // Campo: data e hora atuais por padrão + observador padrão
+  // Campo e Instalação: data e hora atuais por padrão + observador padrão
   agoraCampo();
+  agoraInstalacao();
   const prefsC=JSON.parse(localStorage.getItem('ct_prefs')||'{}');
-  if(prefsC.observador) document.getElementById('c_observador').value=prefsC.observador;
+  if(prefsC.observador){
+    document.getElementById('c_observador').value=prefsC.observador;
+    document.getElementById('i_responsavel').value=prefsC.observador;
+  }
 
   // Status de rede (on-line / off-line)
   atualizarStatusRede();
@@ -1079,7 +1245,7 @@ function showTab(name) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
-  const tabs=['analise','campo','mapa','gestao','tabela','config'];
+  const tabs=['analise','campo','instalacao','mapa','gestao','tabela','config'];
   document.querySelectorAll('.tab')[tabs.indexOf(name)]?.classList.add('active');
   if(name==='mapa') setTimeout(()=>{if(mapa)mapa.invalidateSize();},100);
 }
@@ -1189,7 +1355,7 @@ async function salvarPonto() {
   if (currentUser) await salvarFirestore('pontos', ponto);
   else salvarLocal();
 
-  renderPontos(); atualizarBadges(); atualizarDataLists(); atualizarSelectCameras(); renderMapa(); renderTabela();
+  renderPontos(); atualizarBadges(); atualizarDataLists(); atualizarSelectCameras(); renderMapa(); renderTabela(); renderInstalacoes();
   limparFormPonto();
   toast('📍 Ponto '+(editandoPontoId?'atualizado':'cadastrado')+'! '+nome);
   editandoPontoId=null;
@@ -1752,6 +1918,143 @@ function exportarCampoCSV(){
 }
 
 // ═══════════════════════════════════════════
+// INSTALAÇÃO / DESINSTALAÇÃO / MANUTENÇÃO
+// ═══════════════════════════════════════════
+function agoraInstalacao(){
+  const now=new Date();
+  document.getElementById('i_data').value=now.toISOString().split('T')[0];
+  document.getElementById('i_hora').value=now.toTimeString().slice(0,5);
+}
+function toggleInstTipo(){
+  const t=document.getElementById('i_tipo').value;
+  document.getElementById('i_instWrap').style.display=(t==='instalacao')?'block':'none';
+  document.getElementById('i_desWrap').style.display=(t==='desinstalacao')?'block':'none';
+  document.getElementById('i_manutWrap').style.display=(t==='manutencao')?'block':'none';
+}
+function toggleMotivoOutro(){
+  document.getElementById('i_motivoOutroWrap').style.display=(document.getElementById('i_motivo').value==='outro')?'block':'none';
+}
+function toggleTrocaCartao(){
+  document.getElementById('i_cartaoQualWrap').style.display=(document.getElementById('i_troca_cartao').value==='sim')?'block':'none';
+}
+
+async function salvarInstalacao(){
+  const tipo=document.getElementById('i_tipo').value;
+  const data=document.getElementById('i_data').value;
+  if(!tipo){toast('⚠️ Selecione o que você fez (instalação, desinstalação ou manutenção)',true);return;}
+  if(!data){toast('⚠️ Informe a data (use "Usar data e hora atuais")',true);return;}
+
+  const reg={
+    id:Date.now().toString(),
+    tipo, data,
+    hora:document.getElementById('i_hora').value,
+    lat:parseFloat(document.getElementById('i_lat').value)||null,
+    lng:parseFloat(document.getElementById('i_lng').value)||null,
+    camera:document.getElementById('i_camera').value.trim(),
+    // instalação
+    cartao_gb:tipo==='instalacao'?(parseFloat(document.getElementById('i_cartao_gb').value)||''):'',
+    pilhas:tipo==='instalacao'?document.getElementById('i_pilhas').value:'',
+    // desinstalação
+    motivo:tipo==='desinstalacao'?document.getElementById('i_motivo').value:'',
+    motivo_outro:(tipo==='desinstalacao'&&document.getElementById('i_motivo').value==='outro')?document.getElementById('i_motivo_outro').value.trim():'',
+    // manutenção
+    troca_cartao:tipo==='manutencao'?document.getElementById('i_troca_cartao').value:'',
+    cartao_qual:(tipo==='manutencao'&&document.getElementById('i_troca_cartao').value==='sim')?document.getElementById('i_cartao_qual').value.trim():'',
+    troca_pilha:tipo==='manutencao'?document.getElementById('i_troca_pilha').value:'',
+    manut_outro:tipo==='manutencao'?document.getElementById('i_manut_outro').value.trim():'',
+    responsavel:document.getElementById('i_responsavel').value.trim(),
+    obs:document.getElementById('i_obs').value.trim(),
+  };
+  instalacoes.push(reg);
+  if(currentUser) await salvarFirestore('instalacoes',reg);
+  else salvarLocal();
+  renderInstalacoes(); renderTabela(); atualizarBadges(); atualizarDataLists();
+  toast('💾 Registro de câmera salvo!');
+  limparInstalacao();
+}
+
+function instTipoLabel(t){return{instalacao:'🆕 Instalação',desinstalacao:'📤 Desinstalação',manutencao:'🔧 Manutenção'}[t]||t;}
+function motivoLabel(m){return{local_ruim:'Local ruim',troca_local:'Troca de local',roubo:'Roubo',outro:'Outro'}[m]||m||'';}
+function simNao(v){return v==='sim'?'Sim':v==='nao'?'Não':'';}
+
+function renderInstalacoes(){
+  // Lista lateral
+  const el=document.getElementById('instList');
+  if(el){
+    if(!instalacoes.length){el.innerHTML='<span style="color:#aaa;font-style:italic">Nenhum registro ainda.</span>';}
+    else el.innerHTML=[...instalacoes].reverse().map(r=>{
+      let det='';
+      if(r.tipo==='instalacao') det=`${r.cartao_gb?'💾 '+r.cartao_gb+'GB · ':''}${r.pilhas?'🔋 pilhas '+r.pilhas:''}`;
+      else if(r.tipo==='desinstalacao') det=`❓ ${motivoLabel(r.motivo)}${r.motivo_outro?': '+r.motivo_outro:''}`;
+      else if(r.tipo==='manutencao') det=`💾 troca cartão: ${simNao(r.troca_cartao)||'—'}${r.cartao_qual?' ('+r.cartao_qual+')':''} · 🔋 troca pilha: ${simNao(r.troca_pilha)||'—'}${r.manut_outro?' · '+r.manut_outro:''}`;
+      return `
+      <div style="padding:10px;border:1px solid var(--borda);border-radius:8px;margin-bottom:8px;font-size:.81rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+          <b>${r.camera||'(sem nome)'}</b>
+          <span style="background:var(--verde-bg);color:var(--verde);padding:2px 7px;border-radius:10px;font-size:.7rem;font-weight:700">${instTipoLabel(r.tipo)}</span>
+        </div>
+        <div style="color:#555">${fmtDate(r.data)}${r.hora?' · '+r.hora:''}${r.responsavel?' · '+r.responsavel:''}</div>
+        ${r.lat!=null&&r.lng!=null?`<div class="ponto-coords">📍 ${r.lat.toFixed(5)}, ${r.lng.toFixed(5)}</div>`:''}
+        ${det?`<div style="color:#666;font-size:.76rem;margin-top:2px">${det}</div>`:''}
+        ${r.obs?`<div style="color:#888;font-size:.76rem;margin-top:2px">${r.obs}</div>`:''}
+      </div>`;}).join('');
+  }
+  // Tabela
+  const tbody=document.getElementById('instBody');
+  if(tbody){
+    tbody.innerHTML=instalacoes.map((r,i)=>`<tr>
+      <td>${i+1}</td><td>${fmtDate(r.data)}</td><td>${r.hora||'—'}</td>
+      <td style="font-size:.75rem">${r.lat!=null?r.lat.toFixed(6):'—'}</td>
+      <td style="font-size:.75rem">${r.lng!=null?r.lng.toFixed(6):'—'}</td>
+      <td>${r.camera||'—'}</td><td>${instTipoLabel(r.tipo)}</td>
+      <td>${r.cartao_gb!==''&&r.cartao_gb!=null?r.cartao_gb:'—'}</td>
+      <td>${r.pilhas||'—'}</td>
+      <td>${r.tipo==='desinstalacao'?(motivoLabel(r.motivo)+(r.motivo_outro?': '+r.motivo_outro:'')):'—'}</td>
+      <td>${r.tipo==='manutencao'?(simNao(r.troca_cartao)||'—'):'—'}</td>
+      <td>${r.cartao_qual||'—'}</td>
+      <td>${r.tipo==='manutencao'?(simNao(r.troca_pilha)||'—'):'—'}</td>
+      <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis">${r.manut_outro||'—'}</td>
+      <td>${r.responsavel||'—'}</td>
+      <td style="max-width:90px;overflow:hidden;text-overflow:ellipsis">${r.obs||'—'}</td>
+      <td><button class="del-btn" onclick="deletarInstalacao('${r.id}')">✕</button></td>
+    </tr>`).join('')||'<tr><td colspan="17" style="text-align:center;color:#aaa;padding:14px">Nenhum registro</td></tr>';
+  }
+  // Datalist de câmeras conhecidas (pontos + já digitadas)
+  const nomes=[...new Set([...pontos.map(p=>p.nome),...instalacoes.map(r=>r.camera)].filter(Boolean))];
+  const dl=document.getElementById('camerasListInst');
+  if(dl) dl.innerHTML=nomes.map(n=>`<option value="${n}">`).join('');
+}
+
+async function deletarInstalacao(id){
+  if(!confirm('Remover este registro?'))return;
+  instalacoes=instalacoes.filter(r=>r.id!==id);
+  if(currentUser)await deletarFirestore('instalacoes',id);else salvarLocal();
+  renderInstalacoes();renderTabela();atualizarBadges();
+}
+
+function limparInstalacao(){
+  ['i_camera','i_cartao_gb','i_cartao_qual','i_motivo_outro','i_manut_outro','i_obs'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('i_tipo').value='';
+  document.getElementById('i_pilhas').value='';
+  document.getElementById('i_motivo').value='';
+  document.getElementById('i_troca_cartao').value='nao';
+  document.getElementById('i_troca_pilha').value='nao';
+  toggleInstTipo(); toggleMotivoOutro(); toggleTrocaCartao();
+  // mantém localização/data/hora/responsável para registros em sequência
+  const prefs=JSON.parse(localStorage.getItem('ct_prefs')||'{}');
+  if(prefs.observador&&!document.getElementById('i_responsavel').value) document.getElementById('i_responsavel').value=prefs.observador;
+}
+
+function exportarInstalacoesCSV(){
+  if(!instalacoes.length){toast('Nenhum registro de câmera.',true);return;}
+  let csv='Data,Hora,Latitude,Longitude,Camera,Tipo,Cartao GB,Pilhas,Motivo,Detalhe Motivo,Troca Cartao,Qual Cartao,Troca Pilha,Outro Manutencao,Responsavel,Obs\n';
+  csv+=instalacoes.map(r=>[r.data,r.hora||'',r.lat??'',r.lng??'',r.camera||'',instTipoLabel(r.tipo).replace(/[^\wÀ-ÿ ]/g,'').trim(),r.cartao_gb??'',r.pilhas||'',motivoLabel(r.motivo),r.motivo_outro||'',simNao(r.troca_cartao),r.cartao_qual||'',simNao(r.troca_pilha),r.manut_outro||'',r.responsavel||'',r.obs||''].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`instalacoes_camera_${new Date().toISOString().slice(0,10)}.csv`;a.click();
+  toast('📥 CSV de instalações exportado!');
+}
+
+// ═══════════════════════════════════════════
 // GESTÃO DE CÂMERAS
 // ═══════════════════════════════════════════
 function toggleGestaoFields(){document.getElementById('g_novaCamera_wrap').style.display=document.getElementById('g_tipo').value==='troca'?'block':'none';}
@@ -1803,7 +2106,7 @@ function renderTabela() {
     <td style="max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.obs||'—'}</td>
     <td><button class="del-btn" onclick="deletarReg('${r.id}')">✕</button></td>
   </tr>`).join('')||'<tr><td colspan="16" style="text-align:center;color:#aaa;padding:14px">Nenhum registro</td></tr>';
-  document.getElementById('countLabel').textContent=`${registros.length} registros · ${campoRegistros.length} de campo · ${gestaoEventos.length} eventos · ${pontos.length} pontos`;
+  document.getElementById('countLabel').textContent=`${registros.length} registros · ${campoRegistros.length} de campo · ${instalacoes.length} instalações · ${gestaoEventos.length} eventos · ${pontos.length} pontos`;
 }
 
 function renderGestaoTabela() {
@@ -1820,13 +2123,13 @@ function renderGestaoTabela() {
 
 async function deletarReg(id){if(!confirm('Remover?'))return;registros=registros.filter(r=>r.id!==id);if(currentUser)await deletarFirestore('registros',id);else salvarLocal();renderTabela();atualizarBadges();}
 async function deletarGestao(id){if(!confirm('Remover?'))return;gestaoEventos=gestaoEventos.filter(e=>e.id!==id);if(currentUser)await deletarFirestore('gestao',id);else salvarLocal();renderGestaoTabela();atualizarBadges();}
-function limparTudo(){if(!confirm('Apagar TUDO? Exporte primeiro!'))return;registros=[];gestaoEventos=[];campoRegistros=[];if(!currentUser)salvarLocal();renderTabela();renderGestaoTabela();renderCampo();atualizarBadges();renderMapa();}
+function limparTudo(){if(!confirm('Apagar TUDO? Exporte primeiro!'))return;registros=[];gestaoEventos=[];campoRegistros=[];instalacoes=[];if(!currentUser)salvarLocal();renderTabela();renderGestaoTabela();renderCampo();renderInstalacoes();atualizarBadges();renderMapa();}
 
 // ═══════════════════════════════════════════
 // EXPORTAÇÃO
 // ═══════════════════════════════════════════
 function exportarExcel(){
-  if(!registros.length&&!gestaoEventos.length&&!pontos.length&&!campoRegistros.length){toast('Nenhum dado.',true);return;}
+  if(!registros.length&&!gestaoEventos.length&&!pontos.length&&!campoRegistros.length&&!instalacoes.length){toast('Nenhum dado.',true);return;}
   const wb=XLSX.utils.book_new();
   const cols1=['Data','Hora','Câmera','Latitude','Longitude','Espécie','Nome Científico','Nº','Sexo','Idade','Comportamento','Confiança IA','Arquivo','Observador','Observações'];
   const rows1=registros.map(r=>[r.data,r.hora||'',r.camera,r.lat||'',r.lng||'',r.nome_popular,r.nome_cientifico||'',r.individuos,r.sexo||'',r.idade||'',r.comportamento||'',r.confianca_ia||'',r.arquivo||'',r.observador||'',r.obs||'']);
@@ -1843,6 +2146,11 @@ function exportarExcel(){
   const rowsA=[];
   campoRegistros.forEach(r=>{(r.sample_ids||[]).forEach(idA=>{rowsA.push([idA,r.data,r.hora||'',r.lat??'',r.lng??'',r.nome_popular,r.nome_cientifico||'',estadoLabel(r.estado),r.observador||'']);});});
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([colsA,...rowsA]),'Amostras');
+
+  // Instalação / desinstalação / manutenção de câmeras
+  const colsI=['Data','Hora','Latitude','Longitude','Câmera','Tipo','Cartão (GB)','Pilhas','Motivo','Detalhe Motivo','Troca Cartão','Qual Cartão','Troca Pilha','Outro (manutenção)','Responsável','Observações'];
+  const rowsI=instalacoes.map(r=>[r.data,r.hora||'',r.lat??'',r.lng??'',r.camera||'',instTipoLabel(r.tipo).replace(/[^\wÀ-ÿ ]/g,'').trim(),r.cartao_gb??'',r.pilhas||'',motivoLabel(r.motivo),r.motivo_outro||'',simNao(r.troca_cartao),r.cartao_qual||'',simNao(r.troca_pilha),r.manut_outro||'',r.responsavel||'',r.obs||'']);
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([colsI,...rowsI]),'Instalações Câmera');
 
   const cols2=['Nome','Latitude','Longitude','Altitude','Bioma','Status','Notas'];
   const rows2=pontos.map(p=>[p.nome,p.lat||'',p.lng||'',p.alt||'',p.bioma||'',p.status||'ativo',p.notas||'']);
@@ -2011,15 +2319,16 @@ function extrairMetadados(nome){
   return r;
 }
 function atualizarDataLists(){
-  const obs=[...new Set([...registros.map(r=>r.observador),...campoRegistros.map(r=>r.observador)].filter(Boolean))];
-  ['observadoresList','observadoresList2','observadoresList3'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=obs.map(o=>`<option value="${o}">`).join('');});
+  const obs=[...new Set([...registros.map(r=>r.observador),...campoRegistros.map(r=>r.observador),...instalacoes.map(r=>r.responsavel)].filter(Boolean))];
+  ['observadoresList','observadoresList2','observadoresList3','observadoresList4'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=obs.map(o=>`<option value="${o}">`).join('');});
 }
 function atualizarBadges(){
   document.getElementById('badgeFila').textContent=fileQueue.filter(q=>q.status!=='saved').length;
-  document.getElementById('badgeTabela').textContent=registros.length+gestaoEventos.length+campoRegistros.length;
+  document.getElementById('badgeTabela').textContent=registros.length+gestaoEventos.length+campoRegistros.length+instalacoes.length;
   document.getElementById('badgeGestao').textContent=gestaoEventos.length;
   document.getElementById('badgePontos').textContent=pontos.length;
   document.getElementById('badgeCampo').textContent=campoRegistros.length;
+  document.getElementById('badgeInst').textContent=instalacoes.length;
 }
 function fmtDate(d){if(!d)return'—';const[y,m,dd]=d.split('-');return`${dd}/${m}/${y}`;}
 let toastTimer;
