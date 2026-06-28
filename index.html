@@ -770,7 +770,7 @@ td i{font-style:italic;color:#555;}
         <ol class="step-box">
           <li>Acesse <a href="https://console.firebase.google.com" target="_blank" style="color:var(--verde)">console.firebase.google.com</a></li>
           <li>Crie um projeto → adicione um <b>Web App</b></li>
-          <li>Copie o <code>firebaseConfig</code> e cole abaixo</li>
+          <li>Copie o bloco <code>firebaseConfig = {...}</code> e cole abaixo (pode colar como o Firebase mostra)</li>
           <li>Ative <b>Authentication → Google</b></li>
           <li>Ative <b>Firestore Database</b> (modo teste)</li>
           <li>Em Authentication → Settings → Authorized domains, adicione seu domínio GitHub Pages</li>
@@ -1912,15 +1912,31 @@ async function testarApiKey(){
   btn.textContent='🔬 Testar';btn.disabled=false;
 }
 
+// Aceita tanto JSON puro quanto o trecho que o Firebase mostra
+// (ex.: "const firebaseConfig = { apiKey: "...", ... };" com chaves sem aspas).
+function parseFirebaseConfig(raw){
+  let t=String(raw||'').trim();
+  const ini=t.indexOf('{'), fim=t.lastIndexOf('}');
+  if(ini>=0&&fim>ini) t=t.slice(ini,fim+1); // pega só o objeto { ... }
+  try{ return JSON.parse(t); }catch(e){}
+  // Converte objeto JS (chaves sem aspas, // comentários, vírgula final) para JSON
+  const s=t
+    .replace(/\/\/[^\n\r]*/g,'')                              // remove comentários //
+    .replace(/([{,]\s*)([A-Za-z_$][\w$]*)\s*:/g,'$1"$2":')     // coloca aspas nas chaves
+    .replace(/'/g,'"')                                        // aspas simples -> duplas
+    .replace(/,\s*([}\]])/g,'$1');                            // remove vírgula sobrando
+  return JSON.parse(s);
+}
 function salvarFirebaseConfig(){
   const raw=document.getElementById('firebaseConfigInput').value.trim();
   try{
-    const cfg=JSON.parse(raw);
-    if(!cfg.apiKey||!cfg.projectId) throw new Error('Config incompleto');
+    const cfg=parseFirebaseConfig(raw);
+    if(!cfg.apiKey||!cfg.projectId) throw new Error('Faltam apiKey ou projectId — copie o bloco completo do Firebase.');
     localStorage.setItem('ct_firebase',JSON.stringify(cfg));
+    document.getElementById('firebaseConfigInput').value=JSON.stringify(cfg,null,2);
     document.getElementById('firebaseStatus').innerHTML='<span style="color:var(--verde);font-weight:700">✅ Salvo! Recarregue a página para ativar o login.</span>';
     toast('✅ Firebase configurado! Recarregue a página.');
-  }catch(e){document.getElementById('firebaseStatus').innerHTML=`<span style="color:#dc2626">❌ JSON inválido: ${e.message}</span>`;}
+  }catch(e){document.getElementById('firebaseStatus').innerHTML=`<span style="color:#dc2626">❌ Não consegui ler a configuração: ${e.message}</span>`;}
 }
 function removerFirebaseConfig(){if(!confirm('Remover configuração Firebase?'))return;localStorage.removeItem('ct_firebase');document.getElementById('firebaseConfigInput').value='';document.getElementById('firebaseStatus').innerHTML='<span style="color:#888">Removido.</span>';toast('Firebase removido.');}
 
