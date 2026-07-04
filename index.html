@@ -287,6 +287,9 @@ td i{font-style:italic;color:#555;}
             <p style="font-weight:700;font-size:.92rem">Clique ou arraste fotos e vídeos aqui</p>
             <small style="color:#888;font-size:.75rem">JPG · PNG · MP4 · AVI · MOV — vários de uma vez</small>
           </div>
+          <div class="btn-group" id="salvarTodosWrap" style="margin-top:11px;display:none">
+            <button class="btn btn-primary btn-full" onclick="salvarTodosIdentificados()">💾 Salvar Todos os Identificados na Tabela</button>
+          </div>
           <div id="queueContainer" style="margin-top:11px">
             <div id="emptyQueue" style="text-align:center;color:#aaa;font-size:.83rem;padding:14px;font-style:italic">Nenhum arquivo na fila.</div>
             <div class="queue-grid" id="queueGrid"></div>
@@ -313,10 +316,9 @@ td i{font-style:italic;color:#555;}
 
           <div class="form-row" style="margin-bottom:10px">
             <div class="form-section">
-              <label>📷 Câmera</label>
-              <select id="f_camera" onchange="preencherCoordsDaCamera()">
-                <option value="">— selecione —</option>
-              </select>
+              <label>📷 Câmera <span style="font-weight:normal;color:#aaa">(opcional)</span></label>
+              <input type="text" id="f_camera" list="camerasListIA" placeholder="ex: CAM01" autocomplete="off" oninput="preencherCoordsDaCamera()">
+              <datalist id="camerasListIA"></datalist>
             </div>
             <div class="form-section">
               <label>📅 Data</label>
@@ -1431,12 +1433,12 @@ function preencherCoordsDaCamera() {
 }
 
 function atualizarSelectCameras() {
+  // g_camera é <select> (evento de câmera); f_camera é <input> com datalist (aba IA)
   const opts = pontos.map(p=>`<option value="${p.nome}">${p.nome}${p.status!=='ativo'?' ['+p.status+']':''}</option>`).join('');
-  const emptyOpt = '<option value="">— selecione —</option>';
-  ['f_camera','g_camera'].forEach(id=>{
-    const el=document.getElementById(id);
-    if(el) el.innerHTML = emptyOpt + opts;
-  });
+  const gsel=document.getElementById('g_camera');
+  if(gsel) gsel.innerHTML = '<option value="">— selecione —</option>' + opts;
+  const dl=document.getElementById('camerasListIA');
+  if(dl) dl.innerHTML = pontos.map(p=>`<option value="${p.nome}">`).join('');
 }
 
 // ═══════════════════════════════════════════
@@ -1468,6 +1470,10 @@ async function adicionarArquivos(files) {
 
 function renderQueue() {
   const grid=document.getElementById('queueGrid');
+  // Mostra o botão "Salvar Todos" quando há itens identificados ainda não salvos
+  const temIdentificados=fileQueue.some(q=>q.status==='done'&&q.iaResult&&!q.iaResult.error&&q.iaResult.species_popular);
+  const wrap=document.getElementById('salvarTodosWrap');
+  if(wrap) wrap.style.display=temIdentificados?'flex':'none';
   grid.innerHTML=fileQueue.map((item,i)=>`
     <div class="queue-card ${item.status==='saved'?'done':''} ${selectedIdx===i?'active-card':''}" id="qcard-${i}" onclick="selecionarItem(${i})">
       <div class="queue-card-top">
@@ -1511,11 +1517,11 @@ function selecionarItem(idx) {
   const m=item.meta;
   if(m.data) document.getElementById('f_data').value=m.data;
   if(m.hora) document.getElementById('f_hora').value=m.hora;
+  // Câmera é campo de texto: usa o nome detectado no arquivo ou uma câmera cadastrada correspondente
   if(m.camera) {
-    const sel=document.getElementById('f_camera');
-    // Try to match camera from filename to pontos
-    const match=[...sel.options].find(o=>o.value.toUpperCase()===m.camera.toUpperCase());
-    if(match) { sel.value=match.value; preencherCoordsDaCamera(); }
+    const match=pontos.find(p=>p.nome.toUpperCase()===m.camera.toUpperCase());
+    document.getElementById('f_camera').value = match ? match.nome : m.camera;
+    preencherCoordsDaCamera();
   }
   // Coordenadas extraídas da própria imagem (EXIF/IA), quando não houver câmera com GPS
   if((m.lat!=null&&m.lng!=null) && !document.getElementById('coordsDisplay').classList.contains('show')){
@@ -1685,10 +1691,10 @@ async function chamarGemini(imgData,apiKey) {
   const biomaMap={mata_atlantica:'Mata Atlântica',cerrado:'Cerrado',pantanal:'Pantanal',amazonia:'Amazônia',caatinga:'Caatinga',pampa:'Pampa gaúcho',brasil_geral:'Brasil'};
   const prompt=`Você é um especialista em fauna selvagem do ${biomaMap[bioma]||'Brasil'}.
 Analise esta imagem de câmera trap e identifique a espécie animal presente.
-Leia também QUALQUER tarja/legenda de informação na imagem (geralmente na borda inferior ou superior) e extraia data, hora e coordenadas geográficas, se aparecerem.
+Na tarja/legenda da câmera (geralmente na borda inferior ou superior) pode haver data, hora e coordenadas. IMPORTANTE: só preencha esses campos se os números estiverem CLARAMENTE LEGÍVEIS na imagem; se houver qualquer dúvida, use null. NUNCA invente nem chute data/hora. A data na tarja normalmente está em DD/MM/AAAA (dia primeiro).
 Retorne SOMENTE um JSON válido, sem texto adicional ou markdown:
-{"species_popular":"nome popular em português","species_scientific":"Gênero espécie","count":<número inteiro>,"sex":"Macho"|"Fêmea"|"Indeterminado"|null,"age":"Adulto"|"Jovem"|"Filhote"|"Indeterminado"|null,"behavior":"comportamento observado","confidence":"alta"|"média"|"baixa","notes":"observação sobre qualidade ou identificação (máx 80 chars)","date":"YYYY-MM-DD ou null se não visível","time":"HH:MM ou null se não visível","latitude":<número decimal ou null>,"longitude":<número decimal ou null>}
-Para latitude/longitude use graus decimais (negativo para Sul/Oeste). Se a informação não estiver visível na imagem, use null.
+{"species_popular":"nome popular em português","species_scientific":"Gênero espécie","count":<número inteiro>,"sex":"Macho"|"Fêmea"|"Indeterminado"|null,"age":"Adulto"|"Jovem"|"Filhote"|"Indeterminado"|null,"behavior":"comportamento observado","confidence":"alta"|"média"|"baixa","notes":"observação sobre qualidade ou identificação (máx 80 chars)","date":"AAAA-MM-DD, apenas se claramente legível na tarja, senão null","time":"HH:MM, apenas se claramente legível, senão null","latitude":<número decimal, apenas se legível, senão null>,"longitude":<número decimal, apenas se legível, senão null>}
+Para latitude/longitude use graus decimais (negativo para Sul/Oeste). Na dúvida, use null.
 Se não houver animal: species_popular="Sem animal visível",species_scientific="N/A",count=0,confidence="alta".`;
   // Config de geração: pede JSON puro e dá espaço suficiente para a resposta.
   // Nos modelos 2.5 Flash o "pensamento" consome tokens e cortava a resposta — desligamos.
@@ -1720,9 +1726,10 @@ Se não houver animal: species_popular="Sem animal visível",species_scientific=
 // ═══════════════════════════════════════════
 async function salvarRegistroAtual() {
   const especie=document.getElementById('f_nome_popular').value.trim();
+  // Só a espécie é obrigatória; câmera é opcional e a data cai para hoje se vazia.
+  if(!especie){toast('⚠️ Informe a espécie',true);return;}
   const camera=document.getElementById('f_camera').value.trim();
-  const data=document.getElementById('f_data').value;
-  if(!especie||!camera||!data){toast('⚠️ Preencha Câmera, Data e Espécie',true);return;}
+  const data=document.getElementById('f_data').value||new Date().toISOString().split('T')[0];
   const ponto=pontos.find(p=>p.nome===camera);
   const idxAtual=parseInt(document.getElementById('f_currentIdx').value);
   const metaAtual=(!isNaN(idxAtual)&&fileQueue[idxAtual])?fileQueue[idxAtual].meta:{};
@@ -1753,6 +1760,41 @@ async function salvarRegistroAtual() {
   document.getElementById('iaBanner').style.display='none';
   const prefs=JSON.parse(localStorage.getItem('ct_prefs')||'{}');
   if(prefs.aposRegistro!=='manter') setTimeout(proximoItem,300);
+}
+
+// Salva de uma vez todos os itens já identificados pela IA (sem confirmar um a um)
+async function salvarTodosIdentificados() {
+  const pend=fileQueue.filter(q=>q.status==='done' && q.iaResult && !q.iaResult.error && q.iaResult.species_popular);
+  if(!pend.length){toast('Nenhum item analisado para salvar. Rode a IA primeiro.',true);return;}
+  if(!confirm(`Salvar ${pend.length} registro(s) identificados na tabela?\n\nVocê pode revisar e ajustar depois na aba 📋 Tabela.`)) return;
+  const prefs=JSON.parse(localStorage.getItem('ct_prefs')||'{}');
+  const hoje=new Date().toISOString().split('T')[0];
+  let n=0;
+  for(const item of pend){
+    const r=item.iaResult, m=item.meta||{};
+    const ponto=pontos.find(p=>p.nome===(m.camera||''));
+    const reg={
+      id:Date.now().toString()+Math.random().toString(36).slice(2,6),
+      data:m.data||hoje, hora:m.hora||'',
+      camera:m.camera||'', ponto_id:ponto?.id||'',
+      lat:(ponto?.lat ?? m.lat) ?? null, lng:(ponto?.lng ?? m.lng) ?? null,
+      nome_popular:r.species_popular,
+      nome_cientifico:r.species_scientific||'',
+      individuos:r.count||1,
+      sexo:r.sex||'', idade:r.age||'', comportamento:r.behavior||'',
+      arquivo:item.file.name,
+      observador:prefs.observador||'',
+      obs:r.notes||'',
+      confianca_ia:r.confidence||'', via_ia:true,
+    };
+    registros.push(reg);
+    if(currentUser) await salvarFirestore('registros',reg);
+    item.status='saved';
+    n++;
+  }
+  if(!currentUser) salvarLocal();
+  renderTabela(); renderQueue(); atualizarBadges(); atualizarDataLists();
+  toast(`💾 ${n} registro(s) salvos na tabela!`);
 }
 
 // ═══════════════════════════════════════════
