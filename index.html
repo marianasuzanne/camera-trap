@@ -904,7 +904,7 @@ td i{font-style:italic;color:#555;}
           <label>Modelo</label>
           <select id="modelSelect" onchange="salvarApiKey()">
             <option value="gemini-2.5-flash">Gemini 2.5 Flash — Rápido e gratuito (recomendado)</option>
-            <option value="gemini-2.5-pro">Gemini 2.5 Pro — Maior precisão</option>
+            <option value="gemini-2.5-pro">Gemini 2.5 Pro — Maior precisão (pode não ter cota grátis)</option>
             <option value="gemini-1.5-flash">Gemini 1.5 Flash — Alternativa</option>
           </select>
         </div>
@@ -1488,6 +1488,10 @@ function renderQueue() {
             ${item.iaResult.count?`<span class="ia-tag">🔢 ${item.iaResult.count}</span>`:''}
             ${item.iaResult.confidence?`<span class="ia-tag conf-${item.iaResult.confidence}">${item.iaResult.confidence}</span>`:''}
           </div>
+        </div>`:''}
+      ${item.status==='error'&&item.iaResult&&item.iaResult.error?`
+        <div class="ia-result" style="background:#fef2f2;border-top:1px solid #fecaca">
+          <div style="color:#dc2626;font-weight:600;font-size:.76rem">⚠️ ${item.iaResult.error}</div>
         </div>`:''}`).join('');
 }
 
@@ -1686,17 +1690,29 @@ Retorne SOMENTE um JSON válido, sem texto adicional ou markdown:
 {"species_popular":"nome popular em português","species_scientific":"Gênero espécie","count":<número inteiro>,"sex":"Macho"|"Fêmea"|"Indeterminado"|null,"age":"Adulto"|"Jovem"|"Filhote"|"Indeterminado"|null,"behavior":"comportamento observado","confidence":"alta"|"média"|"baixa","notes":"observação sobre qualidade ou identificação (máx 80 chars)","date":"YYYY-MM-DD ou null se não visível","time":"HH:MM ou null se não visível","latitude":<número decimal ou null>,"longitude":<número decimal ou null>}
 Para latitude/longitude use graus decimais (negativo para Sul/Oeste). Se a informação não estiver visível na imagem, use null.
 Se não houver animal: species_popular="Sem animal visível",species_scientific="N/A",count=0,confidence="alta".`;
+  // Config de geração: pede JSON puro e dá espaço suficiente para a resposta.
+  // Nos modelos 2.5 Flash o "pensamento" consome tokens e cortava a resposta — desligamos.
+  const genCfg={maxOutputTokens:2048,temperature:.1,responseMimeType:'application/json'};
+  if(/2\.5-flash/.test(modelo)) genCfg.thinkingConfig={thinkingBudget:0};
   const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${apiKey}`,{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:imgData.type,data:imgData.data}},{text:prompt}]}],generationConfig:{maxOutputTokens:600,temperature:.1}})
+    body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:imgData.type,data:imgData.data}},{text:prompt}]}],generationConfig:genCfg})
   });
   if(!resp.ok){const e=await resp.json().catch(()=>({}));throw new Error(e.error?.message||`Erro HTTP ${resp.status}`);}
   const data=await resp.json();
-  const text=data.candidates?.[0]?.content?.parts?.[0]?.text||'';
-  const match=text.match(/\{[\s\S]*\}/);
-  if(!match) throw new Error('Resposta inesperada: '+text.substring(0,80));
-  return JSON.parse(match[0]);
+  const cand=data.candidates?.[0];
+  let text=(cand?.content?.parts||[]).map(p=>p.text||'').join('').trim();
+  // remove cercas de markdown ```json ... ``` se aparecerem
+  text=text.replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim();
+  if(!text){
+    const fr=cand?.finishReason;
+    throw new Error(fr==='MAX_TOKENS'?'A resposta ficou longa demais. Tente novamente.':(fr&&fr!=='STOP'?'IA não respondeu ('+fr+')':'A IA não retornou resposta.'));
+  }
+  let jsonText=text;
+  if(jsonText[0]!=='{'){const m=jsonText.match(/\{[\s\S]*\}/);if(m)jsonText=m[0];}
+  try{ return JSON.parse(jsonText); }
+  catch(e){ throw new Error('Não consegui ler a resposta da IA. Tente analisar de novo.'); }
 }
 
 // ═══════════════════════════════════════════
@@ -2211,11 +2227,19 @@ function atualizarApiStatus(){
 async function testarApiKey(){
   const k=localStorage.getItem('ct_apikey');
   if(!k){toast('Configure a API key primeiro.',true);return;}
+  const modelo=localStorage.getItem('ct_model')||'gemini-2.5-flash';
   const btn=event.target;btn.textContent='⏳...';btn.disabled=true;
   try{
-    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${k}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:'OK'}]}],generationConfig:{maxOutputTokens:5}})});
-    if(r.ok){document.getElementById('apiKeyStatus').innerHTML='<span style="color:var(--verde);font-weight:700">✅ Conexão OK!</span>';toast('✅ Gemini conectado!');}
-    else{const e=await r.json();throw new Error(e.error?.message||'Erro '+r.status);}
+    // Testa o MODELO realmente selecionado, para refletir o que a análise vai usar.
+    const gc={maxOutputTokens:600,temperature:0};
+    if(/2\.5-flash/.test(modelo)) gc.thinkingConfig={thinkingBudget:0};
+    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${k}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:'Responda apenas: OK'}]}],generationConfig:gc})});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(j.error?.message||'Erro '+r.status);
+    const fr=j.candidates?.[0]?.finishReason;
+    if(fr&&fr!=='STOP'&&fr!=='MAX_TOKENS') throw new Error('Modelo indisponível ('+fr+')');
+    document.getElementById('apiKeyStatus').innerHTML=`<span style="color:var(--verde);font-weight:700">✅ Conexão OK! (${modelo})</span>`;
+    toast('✅ Gemini conectado!');
   }catch(e){document.getElementById('apiKeyStatus').innerHTML=`<span style="color:#dc2626">❌ ${e.message}</span>`;toast('⚠️ '+e.message,true);}
   btn.textContent='🔬 Testar';btn.disabled=false;
 }
